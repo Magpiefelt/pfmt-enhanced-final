@@ -1,625 +1,429 @@
-// Enhanced ProjectsPage with comprehensive project detail view
+// Fixed ProjectsPage with Proper Data Flow and Navigation
 import React, { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { Button } from '@/components/ui/button.jsx'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
-import { Badge } from '@/components/ui/badge.jsx'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs.jsx'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog.jsx'
-import { Input } from '@/components/ui/input.jsx'
-import { Label } from '@/components/ui/label.jsx'
-import { Textarea } from '@/components/ui/textarea.jsx'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.jsx'
-import { ArrowLeft, Edit, Upload, FileText, Users, Building, CheckCircle, Calendar, DollarSign, MapPin, Filter } from 'lucide-react'
-import { ProjectList, ProjectSummary } from '../components/projects/ProjectList.jsx'
-import { ProjectMilestones, ProjectVendors } from '../components/projects/ProjectDataManagement.jsx'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { ProjectList } from '../components/projects/ProjectList.jsx'
+import { ProjectOverview } from '../components/projects/ProjectProfileComponents.jsx'
 import { PFMTDataExtractor } from '../components/PFMTDataExtractor.jsx'
-import { useProjects, useNotifications, usePFMTExtractor } from '../hooks/index.js'
-import { formatCurrency, formatDate, getStatusColor } from '../utils/index.js'
+import { Button } from '@/components/ui/button.jsx'
+import { ArrowLeft, Upload, Edit, Save, X } from 'lucide-react'
 
-// Project Team Management Component
-function ProjectTeam({ project, onProjectUpdate }) {
-  const [showAddDialog, setShowAddDialog] = useState(false)
-  const [newTeamMember, setNewTeamMember] = useState({
-    name: '',
-    role: '',
-    email: '',
-    phone: '',
-    department: ''
-  })
-  const { showSuccess, showError } = useNotifications()
+// Mock current user - replace with actual auth
+const getCurrentUser = () => ({
+  id: 'user123',
+  name: 'Sarah Johnson',
+  role: 'pm' // pm, spm, director, admin, vendor
+})
 
-  const handleAddTeamMember = async () => {
-    try {
-      const teamMember = {
-        id: Date.now(),
-        ...newTeamMember
-      }
-      
-      const updatedTeam = [...(project.team || []), teamMember]
-      await onProjectUpdate(project.id, { team: updatedTeam })
-      
-      setNewTeamMember({ name: '', role: '', email: '', phone: '', department: '' })
-      setShowAddDialog(false)
-      showSuccess('Team member added successfully')
-    } catch (error) {
-      showError('Failed to add team member: ' + error.message)
+// Mock project data - replace with actual API calls
+const mockProjects = [
+  {
+    id: 1,
+    name: 'Calgary Elementary School Renovation',
+    description: 'Complete renovation of elementary school facilities including classroom upgrades and safety improvements',
+    contractor: 'ABC Construction Ltd.',
+    projectManager: 'Sarah Johnson',
+    createdBy: 'user123', // Added creator tracking
+    location: 'Calgary',
+    phase: 'Construction',
+    status: 'Active',
+    totalBudget: 2450000,
+    amountSpent: 1680000,
+    startDate: '2024-03-15',
+    category: 'Education',
+    clientMinistry: 'Education',
+    projectType: 'Renovation',
+    deliveryType: 'Design-Bid-Build',
+    deliveryMethod: 'Traditional',
+    branch: 'Infrastructure',
+    geographicRegion: 'Calgary',
+    squareMeters: 5000,
+    numberOfStructures: 1,
+    numberOfJobs: 25,
+    municipality: 'Calgary',
+    projectAddress: '123 School Street, Calgary, AB',
+    constituency: 'Calgary-Centre',
+    buildingName: 'Calgary Elementary School',
+    buildingType: 'Educational',
+    buildingId: 'EDU-001',
+    primaryOwner: 'Calgary School Board',
+    plan: 'Plan A',
+    block: 'Block 1',
+    lot: 'Lot 5',
+    latitude: 51.0447,
+    longitude: -114.0719,
+    milestones: {
+      projectInitiation: { plannedDate: '2024-01-15', actualDate: '2024-01-15', baselineDate: '2024-01-15' },
+      siteMobilization: { plannedDate: '2024-03-01', actualDate: '2024-03-05', baselineDate: '2024-03-01' },
+      construction50: { plannedDate: '2024-06-15', actualDate: '', baselineDate: '2024-06-15' }
+    }
+  },
+  {
+    id: 2,
+    name: 'Red Deer Community Center',
+    description: 'New community center construction with recreational facilities',
+    contractor: 'Community Builders Ltd.',
+    projectManager: 'Sarah Johnson',
+    createdBy: 'user123', // Added creator tracking
+    location: 'Red Deer',
+    phase: 'Design',
+    status: 'Active',
+    totalBudget: 3800000,
+    amountSpent: 2280000,
+    startDate: '2024-02-20',
+    category: 'Community',
+    clientMinistry: 'Municipal Affairs',
+    projectType: 'New Construction',
+    deliveryType: 'Design-Build',
+    deliveryMethod: 'Integrated',
+    branch: 'Community Services',
+    geographicRegion: 'Central Alberta',
+    squareMeters: 8000,
+    numberOfStructures: 1,
+    numberOfJobs: 40,
+    municipality: 'Red Deer',
+    projectAddress: '456 Community Drive, Red Deer, AB',
+    constituency: 'Red Deer-North',
+    buildingName: 'Red Deer Community Center',
+    buildingType: 'Community',
+    buildingId: 'COM-002',
+    primaryOwner: 'City of Red Deer',
+    plan: 'Plan B',
+    block: 'Block 2',
+    lot: 'Lot 10',
+    latitude: 52.2681,
+    longitude: -113.8112,
+    milestones: {
+      projectInitiation: { plannedDate: '2024-01-01', actualDate: '2024-01-01', baselineDate: '2024-01-01' },
+      designKickoff: { plannedDate: '2024-02-01', actualDate: '2024-02-05', baselineDate: '2024-02-01' },
+      schematicDesign: { plannedDate: '2024-04-01', actualDate: '', baselineDate: '2024-04-01' }
     }
   }
+]
 
-  const handleRemoveTeamMember = async (memberId) => {
-    try {
-      const updatedTeam = project.team.filter(m => m.id !== memberId)
-      await onProjectUpdate(project.id, { team: updatedTeam })
-      showSuccess('Team member removed successfully')
-    } catch (error) {
-      showError('Failed to remove team member: ' + error.message)
-    }
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center space-x-2">
-              <Users className="h-5 w-5" />
-              <span>Project Team</span>
-            </CardTitle>
-            <CardDescription>Manage project team members and contacts</CardDescription>
-          </div>
-          <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <Users className="h-4 w-4 mr-2" />
-                Add Team Member
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add Team Member</DialogTitle>
-                <DialogDescription>
-                  Add a new team member to this project
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="member-name">Name</Label>
-                  <Input
-                    id="member-name"
-                    value={newTeamMember.name}
-                    onChange={(e) => setNewTeamMember(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Enter team member name"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="member-role">Role</Label>
-                  <Select value={newTeamMember.role} onValueChange={(value) => setNewTeamMember(prev => ({ ...prev, role: value }))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Project Manager">Project Manager</SelectItem>
-                      <SelectItem value="Senior Project Manager">Senior Project Manager</SelectItem>
-                      <SelectItem value="Project Director">Project Director</SelectItem>
-                      <SelectItem value="Engineer">Engineer</SelectItem>
-                      <SelectItem value="Architect">Architect</SelectItem>
-                      <SelectItem value="Coordinator">Coordinator</SelectItem>
-                      <SelectItem value="Specialist">Specialist</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="member-email">Email</Label>
-                  <Input
-                    id="member-email"
-                    type="email"
-                    value={newTeamMember.email}
-                    onChange={(e) => setNewTeamMember(prev => ({ ...prev, email: e.target.value }))}
-                    placeholder="Enter email address"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="member-phone">Phone</Label>
-                  <Input
-                    id="member-phone"
-                    value={newTeamMember.phone}
-                    onChange={(e) => setNewTeamMember(prev => ({ ...prev, phone: e.target.value }))}
-                    placeholder="Enter phone number"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="member-department">Department</Label>
-                  <Input
-                    id="member-department"
-                    value={newTeamMember.department}
-                    onChange={(e) => setNewTeamMember(prev => ({ ...prev, department: e.target.value }))}
-                    placeholder="Enter department"
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setShowAddDialog(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleAddTeamMember}>
-                  Add Team Member
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {project.team?.map((member) => (
-            <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg">
-              <div className="flex-1">
-                <div className="font-medium">{member.name}</div>
-                <div className="text-sm text-gray-600">{member.role}</div>
-                <div className="text-sm text-gray-600">{member.department}</div>
-                <div className="text-sm text-gray-600">{member.email} • {member.phone}</div>
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleRemoveTeamMember(member.id)}
-              >
-                Remove
-              </Button>
-            </div>
-          ))}
-          {(!project.team || project.team.length === 0) && (
-            <div className="text-center py-8 text-gray-500">
-              No team members added yet
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-// Project Information Edit Component
-function ProjectInfoEdit({ project, onProjectUpdate }) {
-  const [showEditDialog, setShowEditDialog] = useState(false)
-  const [editedProject, setEditedProject] = useState({
-    name: project.name || '',
-    description: project.description || '',
-    phase: project.phase || '',
-    status: project.status || '',
-    contractor: project.contractor || '',
-    projectManager: project.projectManager || '',
-    region: project.region || '',
-    startDate: project.startDate || '',
-    endDate: project.endDate || '',
-    totalBudget: project.totalBudget || 0
-  })
-  const { showSuccess, showError } = useNotifications()
-
-  const handleSaveChanges = async () => {
-    try {
-      await onProjectUpdate(project.id, editedProject)
-      setShowEditDialog(false)
-      showSuccess('Project information updated successfully')
-    } catch (error) {
-      showError('Failed to update project: ' + error.message)
-    }
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center space-x-2">
-              <FileText className="h-5 w-5" />
-              <span>Project Information</span>
-            </CardTitle>
-            <CardDescription>Basic project details and settings</CardDescription>
-          </div>
-          <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <Edit className="h-4 w-4 mr-2" />
-                Edit Project
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Edit Project Information</DialogTitle>
-                <DialogDescription>
-                  Update the basic information for this project
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="edit-name">Project Name</Label>
-                  <Input
-                    id="edit-name"
-                    value={editedProject.name}
-                    onChange={(e) => setEditedProject(prev => ({ ...prev, name: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="edit-contractor">Contractor</Label>
-                  <Input
-                    id="edit-contractor"
-                    value={editedProject.contractor}
-                    onChange={(e) => setEditedProject(prev => ({ ...prev, contractor: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="edit-phase">Phase</Label>
-                  <Select value={editedProject.phase} onValueChange={(value) => setEditedProject(prev => ({ ...prev, phase: value }))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Planning">Planning</SelectItem>
-                      <SelectItem value="Design">Design</SelectItem>
-                      <SelectItem value="Construction">Construction</SelectItem>
-                      <SelectItem value="Completion">Completion</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="edit-status">Status</Label>
-                  <Select value={editedProject.status} onValueChange={(value) => setEditedProject(prev => ({ ...prev, status: value }))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Active">Active</SelectItem>
-                      <SelectItem value="On Hold">On Hold</SelectItem>
-                      <SelectItem value="Completed">Completed</SelectItem>
-                      <SelectItem value="Cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="edit-pm">Project Manager</Label>
-                  <Input
-                    id="edit-pm"
-                    value={editedProject.projectManager}
-                    onChange={(e) => setEditedProject(prev => ({ ...prev, projectManager: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="edit-region">Region</Label>
-                  <Input
-                    id="edit-region"
-                    value={editedProject.region}
-                    onChange={(e) => setEditedProject(prev => ({ ...prev, region: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="edit-start">Start Date</Label>
-                  <Input
-                    id="edit-start"
-                    type="date"
-                    value={editedProject.startDate}
-                    onChange={(e) => setEditedProject(prev => ({ ...prev, startDate: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="edit-end">End Date</Label>
-                  <Input
-                    id="edit-end"
-                    type="date"
-                    value={editedProject.endDate}
-                    onChange={(e) => setEditedProject(prev => ({ ...prev, endDate: e.target.value }))}
-                  />
-                </div>
-                <div className="col-span-2">
-                  <Label htmlFor="edit-budget">Total Budget</Label>
-                  <Input
-                    id="edit-budget"
-                    type="number"
-                    value={editedProject.totalBudget}
-                    onChange={(e) => setEditedProject(prev => ({ ...prev, totalBudget: parseFloat(e.target.value) || 0 }))}
-                  />
-                </div>
-                <div className="col-span-2">
-                  <Label htmlFor="edit-description">Description</Label>
-                  <Textarea
-                    id="edit-description"
-                    value={editedProject.description}
-                    onChange={(e) => setEditedProject(prev => ({ ...prev, description: e.target.value }))}
-                    rows={3}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setShowEditDialog(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSaveChanges}>
-                  Save Changes
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-4">
-            <div>
-              <Label className="text-sm font-medium text-gray-600">Project Name</Label>
-              <div className="text-lg font-semibold">{project.name}</div>
-            </div>
-            <div>
-              <Label className="text-sm font-medium text-gray-600">Contractor</Label>
-              <div>{project.contractor}</div>
-            </div>
-            <div>
-              <Label className="text-sm font-medium text-gray-600">Project Manager</Label>
-              <div>{project.projectManager}</div>
-            </div>
-            <div>
-              <Label className="text-sm font-medium text-gray-600">Region</Label>
-              <div className="flex items-center">
-                <MapPin className="h-4 w-4 mr-2 text-gray-500" />
-                {project.region}
-              </div>
-            </div>
-          </div>
-          <div className="space-y-4">
-            <div>
-              <Label className="text-sm font-medium text-gray-600">Phase & Status</Label>
-              <div className="flex items-center space-x-2">
-                <Badge variant="outline">{project.phase}</Badge>
-                <Badge className={getStatusColor(project.status)}>{project.status}</Badge>
-              </div>
-            </div>
-            <div>
-              <Label className="text-sm font-medium text-gray-600">Timeline</Label>
-              <div className="flex items-center text-sm">
-                <Calendar className="h-4 w-4 mr-2 text-gray-500" />
-                {formatDate(project.startDate)} - {formatDate(project.endDate)}
-              </div>
-            </div>
-            <div>
-              <Label className="text-sm font-medium text-gray-600">Budget</Label>
-              <div className="flex items-center text-lg font-semibold">
-                <DollarSign className="h-4 w-4 mr-1 text-gray-500" />
-                {formatCurrency(project.totalBudget)}
-              </div>
-            </div>
-            <div>
-              <Label className="text-sm font-medium text-gray-600">Description</Label>
-              <div className="text-sm text-gray-700">{project.description}</div>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-// Enhanced ProjectsPage component
 export default function ProjectsPage() {
-  const [selectedProject, setSelectedProject] = useState(null)
-  const [showPFMTUpload, setShowPFMTUpload] = useState(false)
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { projects, updateProject } = useProjects()
-  const { showSuccess, showError } = useNotifications()
+  const [projects, setProjects] = useState(mockProjects)
+  const [selectedProject, setSelectedProject] = useState(null)
+  const [showPFMTExtractor, setShowPFMTExtractor] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const projectsPerPage = 10
 
-  // Get filter from URL params
-  const filterFromUrl = searchParams.get('filter') || 'all'
-  const newProjectId = searchParams.get('newProjectId')
+  // Get current user
+  const currentUser = getCurrentUser()
   
-  // Auto-select new project if coming from PFMT creation
+  // Get filter from URL params
+  const filter = searchParams.get('filter') || 'all'
+
   useEffect(() => {
-    if (newProjectId && projects.length > 0) {
-      const newProject = projects.find(p => p.id === parseInt(newProjectId))
-      if (newProject) {
-        setSelectedProject(newProject)
-        // Clear the URL parameter
+    // Check if there's a newly created project to select
+    const newProjectId = searchParams.get('newProject')
+    if (newProjectId) {
+      const project = projects.find(p => p.id === parseInt(newProjectId))
+      if (project) {
+        setSelectedProject(project)
+        // Remove the newProject param from URL
         const newSearchParams = new URLSearchParams(searchParams)
-        newSearchParams.delete('newProjectId')
-        setSearchParams(newSearchParams, { replace: true })
+        newSearchParams.delete('newProject')
+        navigate(`/projects?${newSearchParams.toString()}`, { replace: true })
       }
     }
-  }, [newProjectId, projects, searchParams, setSearchParams])
-  
-  // Set filter in store when component mounts or URL changes
-  useEffect(() => {
-    // This will be handled by the ProjectList component
-  }, [filterFromUrl])
+  }, [searchParams, projects, navigate])
 
-  const handleProjectUpdate = async (projectId, updates) => {
-    try {
-      await updateProject(projectId, updates)
-      // Update the selected project with new data
-      if (selectedProject && selectedProject.id === projectId) {
-        setSelectedProject(prev => ({ ...prev, ...updates }))
+  // Filter projects based on current user and filter type
+  const filteredProjects = projects.filter(project => {
+    if (filter === 'my') {
+      // Show projects where user is PM or creator
+      return project.projectManager === currentUser.name || project.createdBy === currentUser.id
+    }
+    
+    // For 'all' filter, show based on user role
+    if (currentUser.role === 'vendor') {
+      // Vendors only see projects they created or are assigned to
+      return project.createdBy === currentUser.id || project.projectManager === currentUser.name
+    }
+    
+    return true // Directors, admins, SPMs see all projects
+  })
+
+  // Paginate projects
+  const totalPages = Math.ceil(filteredProjects.length / projectsPerPage)
+  const startIndex = (currentPage - 1) * projectsPerPage
+  const paginatedProjects = filteredProjects.slice(startIndex, startIndex + projectsPerPage)
+
+  const handleProjectSelect = (project) => {
+    setSelectedProject(project)
+    setIsEditing(false)
+  }
+
+  const handleBackToList = () => {
+    setSelectedProject(null)
+    setIsEditing(false)
+  }
+
+  const handlePFMTDataExtracted = (data) => {
+    console.log('PFMT Data extracted:', data)
+    
+    if (selectedProject) {
+      // Update existing project with extracted data
+      const updatedProject = {
+        ...selectedProject,
+        // Map Excel data to project fields
+        name: data['Project Name'] || selectedProject.name,
+        description: data.description || selectedProject.description,
+        totalBudget: data.taf || data.totalBudget || selectedProject.totalBudget,
+        amountSpent: data.totalExpenditures || selectedProject.amountSpent,
+        currentYearCashflow: data.currentYearCashflow || selectedProject.currentYearCashflow,
+        eac: data.eac || selectedProject.eac,
+        
+        // Enhanced fields from PFMT data
+        category: data.category || data['Project Category'] || selectedProject.category,
+        clientMinistry: data.clientMinistry || data['Client Ministry'] || selectedProject.clientMinistry,
+        projectType: data.projectType || data['Project Type'] || selectedProject.projectType,
+        deliveryType: data.deliveryType || data['Delivery Type'] || selectedProject.deliveryType,
+        deliveryMethod: data.deliveryMethod || data['Delivery Method'] || selectedProject.deliveryMethod,
+        branch: data.branch || data['Branch'] || selectedProject.branch,
+        geographicRegion: data.geographicRegion || data['Geographic Region'] || selectedProject.geographicRegion,
+        squareMeters: data.squareMeters || data['Square Meters'] || selectedProject.squareMeters,
+        numberOfStructures: data.numberOfStructures || data['Number of Structures'] || selectedProject.numberOfStructures,
+        numberOfJobs: data.numberOfJobs || data['Number of Jobs'] || selectedProject.numberOfJobs,
+        
+        // Location fields
+        municipality: data.municipality || data['Municipality'] || selectedProject.municipality,
+        projectAddress: data.projectAddress || data['Project Address'] || selectedProject.projectAddress,
+        constituency: data.constituency || data['Constituency'] || selectedProject.constituency,
+        buildingName: data.buildingName || data['Building Name'] || selectedProject.buildingName,
+        buildingType: data.buildingType || data['Building Type'] || selectedProject.buildingType,
+        buildingId: data.buildingId || data['Building ID'] || selectedProject.buildingId,
+        primaryOwner: data.primaryOwner || data['Primary Owner'] || selectedProject.primaryOwner,
+        plan: data.plan || data['Plan'] || selectedProject.plan,
+        block: data.block || data['Block'] || selectedProject.block,
+        lot: data.lot || data['Lot'] || selectedProject.lot,
+        latitude: data.latitude || data['Latitude'] || selectedProject.latitude,
+        longitude: data.longitude || data['Longitude'] || selectedProject.longitude,
+        
+        // Financial data
+        taf: data.taf || selectedProject.taf,
+        currentYearTarget: data.currentYearTarget || selectedProject.currentYearTarget,
+        futureYearCashflow: data.futureYearCashflow || selectedProject.futureYearCashflow,
+        previousYearsTargets: data.previousYearsTargets || selectedProject.previousYearsTargets,
+        percentCompleteTAF: data.percentCompleteTAF || selectedProject.percentCompleteTAF,
+        percentCompleteEAC: data.percentCompleteEAC || selectedProject.percentCompleteEAC,
+        
+        // Metadata
+        lastUpdated: new Date().toISOString(),
+        extractedFrom: data.fileName || 'PFMT Excel Upload'
       }
-      showSuccess('Project updated successfully')
-    } catch (error) {
-      showError('Failed to update project: ' + error.message)
-      throw error
+
+      // Update project in list
+      setProjects(prev => prev.map(p => p.id === selectedProject.id ? updatedProject : p))
+      setSelectedProject(updatedProject)
+      
+    } else {
+      // Create new project with extracted data
+      const newProject = {
+        id: Date.now(), // Simple ID generation
+        name: data['Project Name'] || `Project ${Date.now()}`,
+        description: data.description || 'Project created from PFMT Excel upload',
+        totalBudget: data.taf || data.totalBudget || 0,
+        amountSpent: data.totalExpenditures || 0,
+        currentYearCashflow: data.currentYearCashflow || 0,
+        eac: data.eac || 0,
+        phase: 'Planning',
+        status: 'Active',
+        contractor: 'TBD',
+        projectManager: currentUser.name, // Assign to current user
+        createdBy: currentUser.id, // Track creator
+        location: data.location || 'TBD',
+        startDate: new Date().toISOString().split('T')[0],
+        
+        // Enhanced fields from PFMT data
+        category: data.category || data['Project Category'] || 'Infrastructure',
+        clientMinistry: data.clientMinistry || data['Client Ministry'] || 'Infrastructure',
+        projectType: data.projectType || data['Project Type'] || 'New Construction',
+        deliveryType: data.deliveryType || data['Delivery Type'] || 'Design-Bid-Build',
+        deliveryMethod: data.deliveryMethod || data['Delivery Method'] || 'Traditional',
+        branch: data.branch || data['Branch'] || '',
+        geographicRegion: data.geographicRegion || data['Geographic Region'] || '',
+        squareMeters: data.squareMeters || data['Square Meters'] || 0,
+        numberOfStructures: data.numberOfStructures || data['Number of Structures'] || 0,
+        numberOfJobs: data.numberOfJobs || data['Number of Jobs'] || 0,
+        
+        // Location fields
+        municipality: data.municipality || data['Municipality'] || '',
+        projectAddress: data.projectAddress || data['Project Address'] || '',
+        constituency: data.constituency || data['Constituency'] || '',
+        buildingName: data.buildingName || data['Building Name'] || '',
+        buildingType: data.buildingType || data['Building Type'] || '',
+        buildingId: data.buildingId || data['Building ID'] || '',
+        primaryOwner: data.primaryOwner || data['Primary Owner'] || '',
+        plan: data.plan || data['Plan'] || '',
+        block: data.block || data['Block'] || '',
+        lot: data.lot || data['Lot'] || '',
+        latitude: data.latitude || data['Latitude'] || '',
+        longitude: data.longitude || data['Longitude'] || '',
+        
+        // Financial data
+        taf: data.taf || 0,
+        currentYearTarget: data.currentYearTarget || 0,
+        futureYearCashflow: data.futureYearCashflow || 0,
+        previousYearsTargets: data.previousYearsTargets || 0,
+        percentCompleteTAF: data.percentCompleteTAF || 0,
+        percentCompleteEAC: data.percentCompleteEAC || 0,
+        
+        // Metadata
+        createdAt: new Date().toISOString(),
+        lastUpdated: data.lastUpdated || new Date().toISOString(),
+        extractedFrom: data.fileName || 'PFMT Excel Upload',
+        
+        // Initialize empty milestones
+        milestones: {}
+      }
+
+      // Add to projects list
+      setProjects(prev => [newProject, ...prev])
+      
+      // Navigate to new project profile immediately
+      setSelectedProject(newProject)
+      
+      // Update URL to show we're viewing the new project
+      const newSearchParams = new URLSearchParams(searchParams)
+      newSearchParams.set('newProject', newProject.id.toString())
+      navigate(`/projects?${newSearchParams.toString()}`, { replace: true })
+    }
+    
+    // Close extractor
+    setShowPFMTExtractor(false)
+  }
+
+  const handleProjectUpdate = (updates) => {
+    if (selectedProject) {
+      const updatedProject = { ...selectedProject, ...updates, lastUpdated: new Date().toISOString() }
+      setSelectedProject(updatedProject)
+      setProjects(prev => prev.map(p => p.id === selectedProject.id ? updatedProject : p))
     }
   }
 
-  const handlePFMTDataExtracted = async (data) => {
-    try {
-      // Process the extracted PFMT data and update the project
-      const updates = {
-        pfmtData: data,
-        lastPFMTUpdate: new Date().toISOString()
-      }
-      await handleProjectUpdate(selectedProject.id, updates)
-      setShowPFMTUpload(false)
-      showSuccess('PFMT data uploaded and processed successfully')
-    } catch (error) {
-      showError('Failed to process PFMT data: ' + error.message)
-    }
+  const handleEditToggle = () => {
+    setIsEditing(!isEditing)
+  }
+
+  const handleSave = () => {
+    setIsEditing(false)
+    // Here you would typically save to backend
+    console.log('Saving project:', selectedProject)
   }
 
   if (selectedProject) {
     return (
       <div className="p-6">
-        <div className="mb-6">
-          <Button 
-            onClick={() => setSelectedProject(null)}
-            variant="outline"
-            className="mb-4"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Projects
-          </Button>
-          
-          <div className="flex items-center justify-between">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-4">
+            <Button
+              variant="outline"
+              onClick={handleBackToList}
+              className="flex items-center space-x-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Back to Projects</span>
+            </Button>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">{selectedProject.name}</h1>
-              <p className="text-gray-600 mt-1">
-                {selectedProject.contractor} • {selectedProject.phase} • {selectedProject.region}
+              <h1 className="text-2xl font-bold text-gray-900">{selectedProject.name}</h1>
+              <p className="text-gray-600">
+                {selectedProject.contractor} • {selectedProject.phase} • {selectedProject.location}
               </p>
             </div>
-            <div className="flex items-center space-x-2">
-              <Button 
-                onClick={() => setShowPFMTUpload(true)}
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowPFMTExtractor(true)}
+              className="flex items-center space-x-2"
+            >
+              <Upload className="h-4 w-4" />
+              <span>Upload PFMT Data</span>
+            </Button>
+            
+            {isEditing ? (
+              <>
+                <Button
+                  onClick={handleSave}
+                  className="flex items-center space-x-2"
+                >
+                  <Save className="h-4 w-4" />
+                  <span>Save</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsEditing(false)}
+                  className="flex items-center space-x-2"
+                >
+                  <X className="h-4 w-4" />
+                  <span>Cancel</span>
+                </Button>
+              </>
+            ) : (
+              <Button
                 variant="outline"
+                onClick={handleEditToggle}
+                className="flex items-center space-x-2"
               >
-                <Upload className="h-4 w-4 mr-2" />
-                Upload PFMT Data
+                <Edit className="h-4 w-4" />
+                <span>Edit Project</span>
               </Button>
-            </div>
+            )}
           </div>
         </div>
 
-        {/* Project Summary Cards */}
-        <div className="mb-8">
-          <ProjectSummary project={selectedProject} />
-        </div>
+        {/* Project Overview with all components */}
+        <ProjectOverview 
+          project={selectedProject} 
+          onUpdate={handleProjectUpdate}
+          isEditing={isEditing}
+        />
 
-        {/* Project Details Tabs */}
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="milestones">Milestones</TabsTrigger>
-            <TabsTrigger value="vendors">Vendors</TabsTrigger>
-            <TabsTrigger value="team">Team</TabsTrigger>
-            <TabsTrigger value="documents">Documents</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="overview" className="space-y-6">
-            <ProjectInfoEdit 
-              project={selectedProject} 
-              onProjectUpdate={handleProjectUpdate}
-            />
-          </TabsContent>
-          
-          <TabsContent value="milestones" className="space-y-6">
-            <ProjectMilestones 
-              project={selectedProject} 
-              onProjectUpdate={handleProjectUpdate}
-            />
-          </TabsContent>
-          
-          <TabsContent value="vendors" className="space-y-6">
-            <ProjectVendors 
-              project={selectedProject} 
-              onProjectUpdate={handleProjectUpdate}
-            />
-          </TabsContent>
-          
-          <TabsContent value="team" className="space-y-6">
-            <ProjectTeam 
-              project={selectedProject} 
-              onProjectUpdate={handleProjectUpdate}
-            />
-          </TabsContent>
-          
-          <TabsContent value="documents" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <FileText className="h-5 w-5" />
-                  <span>Project Documents</span>
-                </CardTitle>
-                <CardDescription>Manage project documents and PFMT data</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <Button 
-                    onClick={() => setShowPFMTUpload(true)}
-                    className="w-full"
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload PFMT Excel File
-                  </Button>
-                  
-                  {selectedProject.pfmtData && (
-                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                        <span className="font-medium text-green-800">PFMT Data Available</span>
-                      </div>
-                      <div className="text-sm text-green-700 mt-1">
-                        Last updated: {formatDate(selectedProject.lastPFMTUpdate)}
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div className="text-center py-8 text-gray-500">
-                    Document management features coming soon
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-
-        {/* PFMT Upload Dialog */}
-        {showPFMTUpload && (
-          <Dialog open={showPFMTUpload} onOpenChange={setShowPFMTUpload}>
-            <DialogContent className="max-w-4xl">
-              <DialogHeader>
-                <DialogTitle>Upload PFMT Data</DialogTitle>
-                <DialogDescription>
-                  Upload and extract data from PFMT Excel file for {selectedProject.name}
-                </DialogDescription>
-              </DialogHeader>
-              <PFMTDataExtractor
-                project={selectedProject}
-                onDataExtracted={handlePFMTDataExtracted}
-                onClose={() => setShowPFMTUpload(false)}
-              />
-            </DialogContent>
-          </Dialog>
+        {/* PFMT Data Extractor Modal */}
+        {showPFMTExtractor && (
+          <PFMTDataExtractor
+            project={selectedProject}
+            onDataExtracted={handlePFMTDataExtracted}
+            onClose={() => setShowPFMTExtractor(false)}
+          />
         )}
       </div>
     )
   }
-  
+
   return (
     <div className="p-6">
-      <div className="mb-6">
+      <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          {filterFromUrl === 'my' ? 'My Projects' : 'All Projects'}
+          {filter === 'my' ? 'My Projects' : 'All Projects'}
         </h1>
         <p className="text-gray-600">
-          {filterFromUrl === 'my' 
-            ? 'Manage and track your assigned projects'
-            : 'Manage and track all projects in the system'
+          {filter === 'my' ? 
+            'Manage and track your assigned projects' :
+            'Browse all projects in the system'
           }
         </p>
         
-        {/* Filter indicator */}
-        {filterFromUrl !== 'all' && (
-          <div className="mt-4">
-            <Badge variant="outline" className="flex items-center w-fit">
-              <Filter className="h-3 w-3 mr-1" />
-              Filter: {filterFromUrl === 'my' ? 'My Projects' : filterFromUrl}
-            </Badge>
-          </div>
-        )}
+        {/* User role info for debugging */}
+        <div className="mt-2 text-sm text-gray-500">
+          Logged in as: {currentUser.name} ({currentUser.role}) | Showing {filteredProjects.length} projects
+        </div>
       </div>
-      
-      <ProjectList onProjectSelect={setSelectedProject} filter={filterFromUrl} />
+
+      <ProjectList
+        projects={paginatedProjects}
+        onProjectSelect={handleProjectSelect}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        filter={filter}
+      />
     </div>
   )
 }

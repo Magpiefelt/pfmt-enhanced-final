@@ -1,61 +1,40 @@
-// Excel Upload and Parsing Component
+// Fixed PFMT Data Extractor - Handles Non-String Values
 import React, { useState, useCallback } from 'react'
 import * as XLSX from 'xlsx'
-import { Button } from '@/components/ui/button.jsx'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog.jsx'
-import { Alert, AlertDescription } from '@/components/ui/alert.jsx'
-import { Badge } from '@/components/ui/badge.jsx'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table.jsx'
-import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, X } from 'lucide-react'
-import { PFMT_FIELD_MAPPING, ALTERNATIVE_MAPPINGS, FIELD_VALIDATION, DEFAULT_VALUES, PROJECT_INFO_MAPPING, BUDGET_CATEGORIES_MAPPING } from '../utils/pfmtMapping.js'
 
-// PFMT Data Extractor Component
+// PFMT Data Extractor Component - Fixed Version with Better Error Handling
 export function PFMTDataExtractor({ project, onDataExtracted, onClose }) {
   const [file, setFile] = useState(null)
-  const [extractedData, setExtractedData] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
-  const [error, setError] = useState(null)
+  const [extractedData, setExtractedData] = useState(null)
   const [validationResults, setValidationResults] = useState(null)
-
-  // Handle file drop
-  const handleDrop = useCallback((e) => {
-    e.preventDefault()
-    const droppedFile = e.dataTransfer.files[0]
-    if (droppedFile) {
-      handleFileSelect(droppedFile)
-    }
-  }, [])
-
-  const handleDragOver = useCallback((e) => {
-    e.preventDefault()
-  }, [])
+  const [error, setError] = useState(null)
 
   // Handle file selection
-  const handleFileSelect = (selectedFile) => {
-    if (!selectedFile) return
-
-    // Validate file type
-    const validTypes = [
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel.sheet.macroEnabled.12'
-    ]
+  const handleFileSelect = useCallback((event) => {
+    const selectedFile = event.target.files?.[0]
     
-    if (!validTypes.includes(selectedFile.type) && !selectedFile.name.endsWith('.xlsx') && !selectedFile.name.endsWith('.xlsm')) {
-      setError('Please select a valid Excel file (.xlsx or .xlsm)')
+    if (!selectedFile) {
       return
     }
 
-    // Check file size (50MB limit)
-    if (selectedFile.size > 50 * 1024 * 1024) {
-      setError('File size must be less than 50MB')
+    // Validate file type
+    const validTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'application/vnd.ms-excel.sheet.macroEnabled.12', // .xlsm
+      'application/vnd.ms-excel' // .xls
+    ]
+
+    if (!validTypes.includes(selectedFile.type) && 
+        !selectedFile.name.match(/\.(xlsx|xlsm|xls)$/i)) {
+      setError('Please select a valid Excel file (.xlsx, .xlsm, or .xls)')
       return
     }
 
     setFile(selectedFile)
     setError(null)
     processExcelFile(selectedFile)
-  }
+  }, [])
 
   // Process Excel file and extract PFMT data
   const processExcelFile = async (file) => {
@@ -78,19 +57,21 @@ export function PFMTDataExtractor({ project, onDataExtracted, onClose }) {
       // Extract data from SP Fields sheet
       const spFieldsSheet = workbook.Sheets['SP Fields']
       
-      // Enhanced extraction using mapping configuration
+      // Enhanced extraction with proper string handling
       const extractedData = {
         // Primary financial fields from SP Fields sheet
-        taf: getCellValue(spFieldsSheet, 'B2'), // Total Approved Funding
-        eac: getCellValue(spFieldsSheet, 'B6'), // Estimate at Completion
-        currentYearCashflow: getCellValue(spFieldsSheet, 'B4'), // Current Year Cashflow Total
-        currentYearTarget: getCellValue(spFieldsSheet, 'B7'), // Current Year Target
+        taf: safeGetNumber(getCellValue(spFieldsSheet, 'B2')), // Total Approved Funding
+        eac: safeGetNumber(getCellValue(spFieldsSheet, 'B6')), // Estimate at Completion
+        currentYearCashflow: safeGetNumber(getCellValue(spFieldsSheet, 'B4')), // Current Year Cashflow Total
+        currentYearTarget: safeGetNumber(getCellValue(spFieldsSheet, 'B7')), // Current Year Target
         
-        // Auto-populate all mapped fields
-        ...extractMappedFields(spFieldsSheet),
+        // Project information - try multiple locations with safe string handling
+        'Project Name': safeGetString(getCellValue(spFieldsSheet, 'B8')) || 
+                       getProjectNameFromSheets(workbook) || 
+                       safeGetString(file.name.replace(/\.(xlsx|xlsm|xls)$/i, '')),
         
         // Additional fields for validation
-        projectId: getCellValue(spFieldsSheet, 'B1'), // Project ID if available
+        projectId: safeGetString(getCellValue(spFieldsSheet, 'B1')), // Project ID if available
         lastUpdated: new Date().toISOString(),
         
         // Metadata
@@ -100,24 +81,22 @@ export function PFMTDataExtractor({ project, onDataExtracted, onClose }) {
         availableSheets: availableSheets
       }
 
-      // Calculate variances
+      // Calculate variances safely
       if (extractedData.taf && extractedData.eac) {
         extractedData.tafEacVariance = extractedData.taf - extractedData.eac
+        extractedData.variancePercentage = ((extractedData.tafEacVariance / extractedData.taf) * 100).toFixed(2)
       }
 
-      if (extractedData.currentYearTarget && extractedData.currentYearCashflow) {
-        extractedData.cashflowVariance = extractedData.currentYearTarget - extractedData.currentYearCashflow
-      }
-
-      // Validate extracted data
+      // Validate the extracted data
       const validation = validateExtractedData(extractedData, project)
-      setValidationResults(validation)
+      
       setExtractedData(extractedData)
+      setValidationResults(validation)
+      setIsProcessing(false)
 
-    } catch (err) {
-      console.error('Error processing Excel file:', err)
-      setError(`Error processing file: ${err.message}`)
-    } finally {
+    } catch (error) {
+      console.error('Error processing Excel file:', error)
+      setError(`Failed to process Excel file: ${error.message}`)
       setIsProcessing(false)
     }
   }
@@ -136,103 +115,45 @@ export function PFMTDataExtractor({ project, onDataExtracted, onClose }) {
     return cell.v
   }
 
-  // Enhanced field extraction using mapping configuration
-  const extractMappedFields = (sheet) => {
-    const mappedData = {}
-    
-    // Extract fields using primary mapping from SP Fields sheet
-    Object.entries(PFMT_FIELD_MAPPING).forEach(([cellAddress, fieldName]) => {
-      let value = getCellValue(sheet, cellAddress)
-      
-      // Validate and convert field types
-      if (value && FIELD_VALIDATION[fieldName]) {
-        value = validateAndConvertField(value, FIELD_VALIDATION[fieldName])
-      }
-      
-      if (value !== null && value !== undefined && value !== '') {
-        mappedData[fieldName] = value
-      }
-    })
-    
-    // Extract project info from other sheets if available
-    const workbook = sheet.parent
-    Object.entries(PROJECT_INFO_MAPPING).forEach(([sheetCell, fieldName]) => {
-      const [sheetName, cellAddress] = sheetCell.split('!')
-      if (workbook.sheetNames.includes(sheetName)) {
-        const targetSheet = workbook.getWorksheet(sheetName)
-        let value = getCellValue(targetSheet, cellAddress)
-        
-        if (value !== null && value !== undefined && value !== '') {
-          mappedData[fieldName] = value
-        }
-      }
-    })
-    
-    // Extract budget categories from Summary sheet if available
-    if (workbook.sheetNames.includes('Summary (Rpt)')) {
-      const summarySheet = workbook.getWorksheet('Summary (Rpt)')
-      Object.entries(BUDGET_CATEGORIES_MAPPING).forEach(([sheetCell, fieldName]) => {
-        const cellAddress = sheetCell.split('!')[1]
-        let value = getCellValue(summarySheet, cellAddress)
-        
-        if (value && FIELD_VALIDATION[fieldName]) {
-          value = validateAndConvertField(value, FIELD_VALIDATION[fieldName])
-        }
-        
-        if (value !== null && value !== undefined && value !== '') {
-          mappedData[fieldName] = value
-        }
-      })
-    }
-    
-    // Try alternative locations for key fields
-    Object.entries(ALTERNATIVE_MAPPINGS).forEach(([fieldName, altCells]) => {
-      if (!mappedData[fieldName]) {
-        for (const altCell of altCells) {
-          let value
-          if (altCell.includes('!')) {
-            const [sheetName, cellAddress] = altCell.split('!')
-            if (workbook.sheetNames.includes(sheetName)) {
-              const targetSheet = workbook.getWorksheet(sheetName)
-              value = getCellValue(targetSheet, cellAddress)
-            }
-          } else {
-            value = getCellValue(sheet, altCell)
-          }
-          
-          if (value) {
-            mappedData[fieldName] = value
-            break
-          }
-        }
-      }
-    })
-    
-    // Apply default values if still empty
-    Object.entries(DEFAULT_VALUES).forEach(([fieldName, defaultValue]) => {
-      if (!mappedData[fieldName]) {
-        mappedData[fieldName] = defaultValue
-      }
-    })
-    
-    return mappedData
+  // Safe string conversion - handles null, undefined, numbers
+  const safeGetString = (value) => {
+    if (value === null || value === undefined) return ''
+    if (typeof value === 'string') return value.trim()
+    if (typeof value === 'number') return value.toString()
+    if (typeof value === 'boolean') return value.toString()
+    return String(value).trim()
   }
 
-  // Field validation and conversion
-  const validateAndConvertField = (value, type) => {
-    switch (type) {
-      case 'number':
-        const numValue = parseFloat(value)
-        return isNaN(numValue) ? 0 : numValue
-      case 'currency':
-        const currValue = parseFloat(value)
-        return isNaN(currValue) ? 0 : currValue
-      case 'percentage':
-        const pctValue = parseFloat(value)
-        return isNaN(pctValue) ? 0 : (pctValue > 1 ? pctValue / 100 : pctValue) // Convert to decimal if needed
-      default:
-        return value
+  // Safe number conversion
+  const safeGetNumber = (value) => {
+    if (value === null || value === undefined) return 0
+    if (typeof value === 'number') return value
+    if (typeof value === 'string') {
+      const parsed = parseFloat(value.replace(/[,$]/g, ''))
+      return isNaN(parsed) ? 0 : parsed
     }
+    return 0
+  }
+
+  // Try to get project name from various sheet locations
+  const getProjectNameFromSheets = (workbook) => {
+    const locations = [
+      { sheet: 'Validations', cell: 'C6' },
+      { sheet: 'Target Tracking', cell: 'B3' },
+      { sheet: 'Summary (Rpt)', cell: 'B2' }
+    ]
+
+    for (const location of locations) {
+      if (workbook.SheetNames.includes(location.sheet)) {
+        const sheet = workbook.Sheets[location.sheet]
+        const value = getCellValue(sheet, location.cell)
+        const stringValue = safeGetString(value)
+        if (stringValue && stringValue.length > 0) {
+          return stringValue
+        }
+      }
+    }
+    return null
   }
 
   // Validate extracted data
@@ -240,304 +161,231 @@ export function PFMTDataExtractor({ project, onDataExtracted, onClose }) {
     const issues = []
     const warnings = []
 
-    // Check for required fields
+    // Check for required financial data
     if (!data.taf || data.taf <= 0) {
       issues.push('Total Approved Funding (TAF) is missing or invalid')
     }
+
     if (!data.eac || data.eac <= 0) {
-      issues.push('Estimate at Completion (EAC) is missing or invalid')
-    }
-    if (!data.currentYearCashflow || data.currentYearCashflow < 0) {
-      issues.push('Current Year Cashflow is missing or invalid')
-    }
-    if (!data.currentYearTarget || data.currentYearTarget <= 0) {
-      issues.push('Current Year Target is missing or invalid')
+      warnings.push('Estimate at Completion (EAC) is missing or invalid')
     }
 
-    // Business rule validations
-    if (data.taf && data.eac && Math.abs(data.tafEacVariance) > data.taf * 0.1) {
-      warnings.push(`Large TAF vs EAC variance detected: ${formatCurrency(data.tafEacVariance)}`)
-    }
-
-    if (data.currentYearTarget && data.currentYearCashflow && Math.abs(data.cashflowVariance) > 1000000) {
-      warnings.push(`Large cashflow variance detected: ${formatCurrency(data.cashflowVariance)} (>$1M)`)
-    }
-
-    // Check if EAC is reasonable compared to TAF
-    if (data.taf && data.eac && data.eac > data.taf * 1.5) {
-      warnings.push('EAC is significantly higher than TAF (>150%)')
+    // Check for project name with safe string handling
+    const projectName = safeGetString(data['Project Name'])
+    if (!projectName || projectName.length === 0) {
+      warnings.push('Project name could not be extracted from Excel file')
     }
 
     return {
       isValid: issues.length === 0,
       issues,
       warnings,
-      hasWarnings: warnings.length > 0
+      extractedFieldCount: Object.keys(data).filter(key => {
+        const value = data[key]
+        return value !== null && value !== undefined && value !== '' && value !== 0
+      }).length
     }
-  }
-
-  // Format currency for display
-  const formatCurrency = (value) => {
-    if (value === null || value === undefined) return 'N/A'
-    return new Intl.NumberFormat('en-CA', {
-      style: 'currency',
-      currency: 'CAD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(value)
   }
 
   // Handle data import confirmation
   const handleImportData = () => {
     if (extractedData && validationResults?.isValid) {
-      onDataExtracted(extractedData)
-      // Don't call onClose here - let the parent handle navigation
+      // Ensure all string fields are properly converted
+      const cleanedData = {
+        ...extractedData,
+        'Project Name': safeGetString(extractedData['Project Name']),
+        projectId: safeGetString(extractedData.projectId)
+      }
+      onDataExtracted(cleanedData)
+      // Don't auto-close, let parent handle navigation
     }
   }
 
-  return (
-    <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2">
-            <FileSpreadsheet className="h-5 w-5" />
-            <span>Import PFMT Data</span>
-          </DialogTitle>
-          <DialogDescription>
-            Upload your PFMT Excel workbook to automatically populate project financial data
-          </DialogDescription>
-        </DialogHeader>
+  // Handle drag and drop
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }, [])
 
-        <div className="space-y-6">
-          {/* File Upload Area */}
+  const handleDrop = useCallback((e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    const files = Array.from(e.dataTransfer.files)
+    const excelFile = files.find(file => 
+      file.name.match(/\.(xlsx|xlsm|xls)$/i)
+    )
+    
+    if (excelFile) {
+      setFile(excelFile)
+      setError(null)
+      processExcelFile(excelFile)
+    } else {
+      setError('Please drop a valid Excel file (.xlsx, .xlsm, or .xls)')
+    }
+  }, [])
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">Import PFMT Data</h2>
+            <p className="text-sm text-gray-600 mt-1">
+              Upload your PFMT Excel file to extract project data
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6">
           {!file && (
             <div
               className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors"
-              onDrop={handleDrop}
               onDragOver={handleDragOver}
+              onDrop={handleDrop}
             >
-              <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <p className="text-lg font-medium text-gray-900 mb-2">
-                Drop your PFMT Excel file here
-              </p>
-              <p className="text-sm text-gray-600 mb-4">
-                or click to browse for files
-              </p>
-              <input
-                type="file"
-                accept=".xlsx,.xlsm"
-                onChange={(e) => handleFileSelect(e.target.files[0])}
-                className="hidden"
-                id="file-upload"
-              />
-              <label htmlFor="file-upload">
-                <Button variant="outline" className="cursor-pointer">
-                  Select File
-                </Button>
-              </label>
-              <p className="text-xs text-gray-500 mt-2">
-                Supports .xlsx and .xlsm files up to 50MB
-              </p>
+              <div className="flex flex-col items-center">
+                <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Upload PFMT Excel File</h3>
+                <p className="text-gray-600 mb-4">Drag and drop your file here, or click to browse</p>
+                <label className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 cursor-pointer transition-colors">
+                  Choose File
+                  <input
+                    type="file"
+                    accept=".xlsx,.xlsm,.xls"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                </label>
+                <p className="text-xs text-gray-500 mt-2">Supports .xlsx, .xlsm, and .xls files</p>
+              </div>
             </div>
           )}
 
-          {/* File Processing Status */}
-          {file && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Selected File</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <FileSpreadsheet className="h-4 w-4" />
-                    <span className="text-sm font-medium">{file.name}</span>
-                    <Badge variant="outline">
-                      {(file.size / 1024 / 1024).toFixed(1)} MB
-                    </Badge>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setFile(null)
-                      setExtractedData(null)
-                      setError(null)
-                      setValidationResults(null)
-                    }}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Processing Indicator */}
-          {isProcessing && (
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                Processing Excel file and extracting PFMT data...
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* Error Display */}
           {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
+            <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
+              <div className="flex">
+                <svg className="w-5 h-5 text-red-400 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <h3 className="text-sm font-medium text-red-800">Error</h3>
+                  <p className="text-sm text-red-700 mt-1">{error}</p>
+                </div>
+              </div>
+            </div>
           )}
 
-          {/* Extracted Data Preview */}
-          {extractedData && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                  <span>Extracted PFMT Data</span>
-                </CardTitle>
-                <CardDescription>
-                  Review the extracted data before importing
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Field</TableHead>
-                      <TableHead>Current Value</TableHead>
-                      <TableHead>New Value</TableHead>
-                      <TableHead>Change</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell className="font-medium">Total Approved Funding (TAF)</TableCell>
-                      <TableCell>{formatCurrency(project.taf)}</TableCell>
-                      <TableCell>{formatCurrency(extractedData.taf)}</TableCell>
-                      <TableCell>
-                        {extractedData.taf && project.taf ? 
-                          formatCurrency(extractedData.taf - project.taf) : 'N/A'}
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">Estimate at Completion (EAC)</TableCell>
-                      <TableCell>{formatCurrency(project.eac)}</TableCell>
-                      <TableCell>{formatCurrency(extractedData.eac)}</TableCell>
-                      <TableCell>
-                        {extractedData.eac && project.eac ? 
-                          formatCurrency(extractedData.eac - project.eac) : 'N/A'}
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">Current Year Cashflow</TableCell>
-                      <TableCell>{formatCurrency(project.currentYearCashflow)}</TableCell>
-                      <TableCell>{formatCurrency(extractedData.currentYearCashflow)}</TableCell>
-                      <TableCell>
-                        {extractedData.currentYearCashflow && project.currentYearCashflow ? 
-                          formatCurrency(extractedData.currentYearCashflow - project.currentYearCashflow) : 'N/A'}
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">Current Year Target</TableCell>
-                      <TableCell>{formatCurrency(project.targetCashflow)}</TableCell>
-                      <TableCell>{formatCurrency(extractedData.currentYearTarget)}</TableCell>
-                      <TableCell>
-                        {extractedData.currentYearTarget && project.targetCashflow ? 
-                          formatCurrency(extractedData.currentYearTarget - project.targetCashflow) : 'N/A'}
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
+          {isProcessing && (
+            <div className="text-center py-8">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <p className="text-gray-600 mt-2">Processing Excel file...</p>
+            </div>
+          )}
 
-                {/* Calculated Variances */}
-                <div className="mt-4 space-y-2">
-                  <h4 className="font-medium">Calculated Variances</h4>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-600">TAF vs EAC Variance:</span>
-                      <span className={`ml-2 font-medium ${
-                        extractedData.tafEacVariance > 0 ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {formatCurrency(extractedData.tafEacVariance)}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Cashflow Variance:</span>
-                      <span className={`ml-2 font-medium ${
-                        extractedData.cashflowVariance > 0 ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {formatCurrency(extractedData.cashflowVariance)}
-                      </span>
-                    </div>
+          {extractedData && validationResults && (
+            <div className="space-y-4">
+              {/* Validation Results */}
+              <div className={`border rounded-md p-4 ${validationResults.isValid ? 'border-green-200 bg-green-50' : 'border-yellow-200 bg-yellow-50'}`}>
+                <div className="flex items-center">
+                  <svg className={`w-5 h-5 mr-2 ${validationResults.isValid ? 'text-green-600' : 'text-yellow-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={validationResults.isValid ? "M5 13l4 4L19 7" : "M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"} />
+                  </svg>
+                  <h3 className={`font-medium ${validationResults.isValid ? 'text-green-800' : 'text-yellow-800'}`}>
+                    {validationResults.isValid ? 'Data Validation Passed' : 'Data Validation Warnings'}
+                  </h3>
+                </div>
+                <p className={`text-sm mt-1 ${validationResults.isValid ? 'text-green-700' : 'text-yellow-700'}`}>
+                  Extracted {validationResults.extractedFieldCount} fields from Excel file
+                </p>
+                
+                {validationResults.issues.length > 0 && (
+                  <ul className="text-sm text-red-700 mt-2 list-disc list-inside">
+                    {validationResults.issues.map((issue, index) => (
+                      <li key={index}>{issue}</li>
+                    ))}
+                  </ul>
+                )}
+                
+                {validationResults.warnings.length > 0 && (
+                  <ul className="text-sm text-yellow-700 mt-2 list-disc list-inside">
+                    {validationResults.warnings.map((warning, index) => (
+                      <li key={index}>{warning}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {/* Extracted Data Preview */}
+              <div className="border rounded-md p-4">
+                <h3 className="font-medium text-gray-900 mb-3">Extracted Data Preview</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium text-gray-700">Project Name:</span>
+                    <span className="ml-2 text-gray-900">{safeGetString(extractedData['Project Name']) || 'Not found'}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">File Name:</span>
+                    <span className="ml-2 text-gray-900">{extractedData.fileName}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">TAF:</span>
+                    <span className="ml-2 text-gray-900">${extractedData.taf?.toLocaleString() || 'Not found'}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">EAC:</span>
+                    <span className="ml-2 text-gray-900">${extractedData.eac?.toLocaleString() || 'Not found'}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Current Year Cashflow:</span>
+                    <span className="ml-2 text-gray-900">${extractedData.currentYearCashflow?.toLocaleString() || 'Not found'}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Available Sheets:</span>
+                    <span className="ml-2 text-gray-900">{extractedData.availableSheets?.length || 0}</span>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Validation Results */}
-          {validationResults && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  {validationResults.isValid ? (
-                    <CheckCircle className="h-5 w-5 text-green-500" />
-                  ) : (
-                    <AlertCircle className="h-5 w-5 text-red-500" />
-                  )}
-                  <span>Validation Results</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {validationResults.issues.length > 0 && (
-                  <div className="mb-4">
-                    <h4 className="font-medium text-red-600 mb-2">Issues Found:</h4>
-                    <ul className="list-disc list-inside space-y-1 text-sm text-red-600">
-                      {validationResults.issues.map((issue, index) => (
-                        <li key={index}>{issue}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {validationResults.warnings.length > 0 && (
-                  <div>
-                    <h4 className="font-medium text-yellow-600 mb-2">Warnings:</h4>
-                    <ul className="list-disc list-inside space-y-1 text-sm text-yellow-600">
-                      {validationResults.warnings.map((warning, index) => (
-                        <li key={index}>{warning}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {validationResults.isValid && validationResults.warnings.length === 0 && (
-                  <p className="text-green-600 text-sm">
-                    All validations passed. Data is ready for import.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleImportData}
-            disabled={!extractedData || !validationResults?.isValid || isProcessing}
+        {/* Footer */}
+        <div className="flex items-center justify-end space-x-3 p-6 border-t bg-gray-50">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
           >
-            Import Data
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            Cancel
+          </button>
+          {extractedData && (
+            <button
+              onClick={handleImportData}
+              disabled={!validationResults?.isValid}
+              className={`px-4 py-2 rounded-md transition-colors ${
+                validationResults?.isValid
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              Import Data
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }
 
