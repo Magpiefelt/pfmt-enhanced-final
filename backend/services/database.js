@@ -446,12 +446,15 @@ export function getProjectById(id) {
   return db.data.projects?.find(p => p.id === id) || null
 }
 
-export function createProject(projectData) {
+export function createProject(projectData, userContext = null) {
   db.read()
   
   const newProject = {
     id: uuidv4(),
     ...projectData,
+    // Ensure proper user context is set for visibility
+    createdByUserId: userContext?.id || projectData.createdByUserId || projectData.ownerId,
+    ownerId: projectData.ownerId || userContext?.id,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     lastUpdated: new Date().toISOString()

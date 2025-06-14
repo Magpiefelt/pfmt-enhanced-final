@@ -176,7 +176,7 @@ export class ProjectController {
         projectData.createdByUserId = req.user.id
       }
       
-      const newProject = ProjectService.createProject(projectData)
+      const newProject = ProjectService.createProject(projectData, req.user)
       
       res.status(201).json({
         success: true,

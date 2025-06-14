@@ -76,7 +76,7 @@ export class ProjectService {
   }
   
   // Create new project
-  static createProject(projectData) {
+  static createProject(projectData, userContext = null) {
     // Validate required fields
     const requiredFields = ['name']
     for (const field of requiredFields) {
@@ -182,7 +182,7 @@ export class ProjectService {
       lastUpdated: new Date().toISOString()
     }
     
-    return db.createProject(newProject)
+    return db.createProject(newProject, userContext)
   }
   
   // Update project
@@ -238,9 +238,11 @@ export class ProjectService {
   static processSPFields(worksheet) {
     const spData = {}
     
+    console.log('Processing SP Fields sheet with correct field mappings...')
+    
     // Read key-value pairs from SP Fields sheet
-    // Assuming format: Column A = Field, Column B = Value
-    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:B20')
+    // Based on analysis: Column A = Field, Column B = Value
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:B30')
     
     for (let row = range.s.r; row <= range.e.r; row++) {
       const fieldCell = worksheet[XLSX.utils.encode_cell({r: row, c: 0})]
@@ -252,16 +254,32 @@ export class ProjectService {
         
         if (field && value !== undefined) {
           spData[field] = value
+          console.log(`  SP Field found: ${field} = ${value}`)
         }
       }
     }
     
-    return {
-      approvedTPC: this.toNumber(spData.SPOApprovedTPC),
-      totalBudget: this.toNumber(spData.SPOBudgetTotal),
-      currentYearCashflow: this.toNumber(spData.SPOCashflowCurrentYearTotal),
-      futureYearCashflow: this.toNumber(spData.SPOCashflowFutureYearTotal)
+    // Map to standardized field names with correct mappings from analysis
+    const result = {
+      approvedTPC: this.toNumber(spData.SPOApprovedTPC) || 0,
+      totalBudget: this.toNumber(spData.SPOBudgetTotal) || 0,
+      currentYearCashflow: this.toNumber(spData.SPOCashflowCurrentYearTotal) || 0,
+      futureYearCashflow: this.toNumber(spData.SPOCashflowFutureYearTotal) || 0,
+      taf: this.toNumber(spData.SPOTotalApprovedFunding || spData.TAF || spData.SPOApprovedTPC) || 0,
+      eac: this.toNumber(spData.SPOEstimateAtCompletion || spData.EAC) || 0,
+      amountSpent: this.toNumber(spData.SPOAmountSpentTotal) || 0,
+      commitment: this.toNumber(spData.SPOCommitmentTotal) || 0,
+      variance: this.toNumber(spData.SPOVarianceTotal) || 0
     }
+    
+    // Calculate derived values if not present
+    result.totalCashflow = result.currentYearCashflow + result.futureYearCashflow
+    if (!result.variance && result.approvedTPC && result.eac) {
+      result.variance = result.approvedTPC - result.eac
+    }
+    
+    console.log('Final SP Fields mapping:', result)
+    return result
   }
   
   // Process SP Fund Src sheet
@@ -343,32 +361,96 @@ export class ProjectService {
     return changeOrders
   }
   
-  // Process Cost Tracking sheet
+  // Process Cost Tracking sheet for vendor data with correct mappings
   static processCostTracking(worksheet) {
+    console.log('Processing Cost Tracking sheet with correct header mappings...')
+    
+    // Based on analysis: header row is 4 (0-indexed as 3)
     const costData = XLSX.utils.sheet_to_json(worksheet, { 
-      header: 4, // Header is on row 4 based on analysis
+      header: 1, // Start from row 1 to capture headers properly
       defval: ""
     })
     
     const vendors = []
     
-    for (const row of costData) {
-      if (row['Vendor / Org.']) {
-        vendors.push({
-          name: row['Vendor / Org.'] || '',
-          currentCommitment: this.toNumber(row['Current Commitment']),
-          billedToDate: this.toNumber(row['Billed to Date']),
-          percentSpent: this.toNumber(row['% Spent']),
-          holdback: this.toNumber(row['Holdback']),
-          latestCostDate: row['Latest Cost Date'] || '',
-          cashflowTotal: this.toNumber(row['Cashflow Total']),
-          cmsValue: this.toNumber(row['CMS Value']),
-          cmsAsOfDate: row['CMS As of Date'] || '',
-          variance: this.toNumber(row['Variance'])
-        })
+    // Use header row 4 (index 3) based on analysis
+    const headerRowIndex = 3 // Row 4 in Excel (0-indexed)
+    
+    if (headerRowIndex >= costData.length) {
+      console.log('Header row not found in Cost Tracking sheet')
+      return vendors
+    }
+    
+    const headers = costData[headerRowIndex]
+    console.log('Cost Tracking headers from row 4:', headers)
+    
+    // Map column indices based on analysis findings
+    const columnMap = {}
+    for (let j = 0; j < headers.length; j++) {
+      const header = headers[j] ? headers[j].toString().toLowerCase().trim() : ''
+      
+      if (header.includes('vendor') || header.includes('org')) {
+        columnMap.vendorName = j
+      } else if (header.includes('contract') && header.includes('id')) {
+        columnMap.contractId = j
+      } else if (header.includes('current') && header.includes('commitment')) {
+        columnMap.currentCommitment = j
+      } else if (header.includes('billed') && header.includes('date')) {
+        columnMap.billedToDate = j
+      } else if (header.includes('spent') && header.includes('%')) {
+        columnMap.percentSpent = j
+      } else if (header.includes('holdback')) {
+        columnMap.holdback = j
+      } else if (header.includes('latest') && header.includes('cost') && header.includes('date')) {
+        columnMap.latestCostDate = j
+      } else if (header.includes('cashflow') && header.includes('total')) {
+        columnMap.cashflowTotal = j
       }
     }
     
+    console.log('Column mapping:', columnMap)
+    
+    // Process data rows starting from row 5 (index 4)
+    for (let i = headerRowIndex + 1; i < costData.length; i++) {
+      const row = costData[i]
+      if (!Array.isArray(row)) continue
+      
+      // Get vendor name from mapped column or fallback to column B (index 1)
+      const vendorName = row[columnMap.vendorName] || row[1] || ''
+      
+      if (vendorName && typeof vendorName === 'string' && vendorName.trim().length > 2) {
+        const trimmedName = vendorName.trim()
+        
+        // Skip header-like entries
+        if (trimmedName.toLowerCase().includes('vendor') || 
+            trimmedName.toLowerCase().includes('summary') ||
+            trimmedName.toLowerCase().includes('total')) {
+          continue
+        }
+        
+        const vendor = {
+          name: trimmedName,
+          contractId: row[columnMap.contractId] || '',
+          currentCommitment: this.toNumber(row[columnMap.currentCommitment]) || 0,
+          billedToDate: this.toNumber(row[columnMap.billedToDate]) || 0,
+          percentSpent: this.toNumber(row[columnMap.percentSpent]) || 0,
+          holdback: this.toNumber(row[columnMap.holdback]) || 0,
+          latestCostDate: row[columnMap.latestCostDate] || '',
+          cashflowTotal: this.toNumber(row[columnMap.cashflowTotal]) || 0,
+          status: 'Active',
+          changeStatus: '',
+          changeValue: 0
+        }
+        
+        // Calculate remaining commitment
+        vendor.remainingCommitment = vendor.currentCommitment - vendor.billedToDate
+        
+        vendors.push(vendor)
+        console.log(`  Vendor extracted: ${vendor.name} (Contract: ${vendor.contractId})`)
+      }
+    }
+    
+    console.log(`Total vendors extracted: ${vendors.length}`)
     return vendors
   }
   
@@ -388,15 +470,56 @@ export class ProjectService {
   static processValidations(worksheet) {
     const validationData = {}
     
-    // Look for project title
-    const projectTitle = this.getCellValue(worksheet, 'B5') || ''
+    // Extract project title from C6 based on analysis results
+    const projectTitle = this.getCellValue(worksheet, 'C6') || 
+                        this.getCellValue(worksheet, 'A5') || 
+                        this.getCellValue(worksheet, 'B5') || ''
     
-    // Look for other validation data
-    // This would need to be customized based on the actual structure
+    console.log('Checking project name extraction:')
+    console.log('  C6:', this.getCellValue(worksheet, 'C6'))
+    console.log('  A5:', this.getCellValue(worksheet, 'A5'))
+    console.log('  B5:', this.getCellValue(worksheet, 'B5'))
     
-    return {
-      name: projectTitle
+    if (projectTitle && projectTitle.trim()) {
+      validationData.name = projectTitle.trim()
+      console.log(`Project name extracted: "${validationData.name}"`)
+    } else {
+      // Fallback: scan for project name patterns
+      console.log('No project name found in expected cells, scanning...')
+      const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:F20')
+      for (let row = range.s.r; row <= Math.min(range.e.r, 20); row++) {
+        for (let col = range.s.c; col <= Math.min(range.e.c, 5); col++) {
+          const cellAddr = XLSX.utils.encode_cell({r: row, c: col})
+          const cellValue = this.getCellValue(worksheet, cellAddr)
+          
+          if (cellValue && typeof cellValue === 'string') {
+            // Look for patterns that might indicate a project name
+            if (cellValue.toLowerCase().includes('justice') || 
+                cellValue.toLowerCase().includes('center') ||
+                cellValue.toLowerCase().includes('centre') ||
+                (cellValue.length > 5 && cellValue.length < 100 && 
+                 !cellValue.toLowerCase().includes('field') &&
+                 !cellValue.toLowerCase().includes('value') &&
+                 !cellValue.toLowerCase().includes('validation') &&
+                 !cellValue.toLowerCase().includes('category'))) {
+              validationData.name = cellValue.trim()
+              console.log(`Found potential project name at ${cellAddr}: ${cellValue}`)
+              break
+            }
+          }
+        }
+        if (validationData.name) break
+      }
     }
+    
+    // Extract other validation fields
+    validationData.projectManager = this.getCellValue(worksheet, 'B10') || ''
+    validationData.category = this.getCellValue(worksheet, 'B8') || ''
+    validationData.phase = this.getCellValue(worksheet, 'B9') || ''
+    validationData.geographicRegion = this.getCellValue(worksheet, 'B11') || ''
+    
+    console.log('Final extracted validation data:', validationData)
+    return validationData
   }
   
   // Enhanced PFMT Excel processing with comprehensive field mapping
@@ -437,12 +560,29 @@ export class ProjectService {
         sheetsProcessed: []
       }
       
-      // Process SP Fields sheet (highest priority)
+      // Process Validations sheet FIRST (highest priority for project name)
+      if (workbook.SheetNames.includes('Validations')) {
+        console.log('Processing Validations sheet (priority for project name)...')
+        const validationData = this.processValidations(workbook.Sheets['Validations'])
+        extractedData = { ...extractedData, ...validationData }
+        extractedData.sheetsProcessed.push('Validations')
+        console.log(`✅ Project name from Validations: "${extractedData.name}"`)
+      }
+      
+      // Process SP Fields sheet (financial data only - DO NOT override name)
       if (workbook.SheetNames.includes('SP Fields')) {
-        console.log('Processing SP Fields sheet...')
+        console.log('Processing SP Fields sheet (financial data only)...')
         const spFieldsData = this.processSPFields(workbook.Sheets['SP Fields'])
+        
+        // CRITICAL: Remove any name field from SP Fields to prevent override
+        if (spFieldsData.name) {
+          console.log(`⚠️  Removing incorrect name from SP Fields: "${spFieldsData.name}"`)
+          delete spFieldsData.name
+        }
+        
         extractedData = { ...extractedData, ...spFieldsData }
         extractedData.sheetsProcessed.push('SP Fields')
+        console.log(`✅ Project name preserved: "${extractedData.name}"`)
       }
       
       // Process SP Fund Src sheet
@@ -486,13 +626,7 @@ export class ProjectService {
         extractedData.sheetsProcessed.push('Prime Cont. Summary')
       }
       
-      // Process Validations sheet
-      if (workbook.SheetNames.includes('Validations')) {
-        console.log('Processing Validations sheet...')
-        const validationData = this.processValidations(workbook.Sheets['Validations'])
-        extractedData = { ...extractedData, ...validationData }
-        extractedData.sheetsProcessed.push('Validations')
-      }
+      // Validations sheet already processed first for project name priority
       
       // Calculate derived values
       const tafEacVariance = extractedData.eac - extractedData.taf
@@ -502,8 +636,10 @@ export class ProjectService {
       
       // Prepare comprehensive update data
       const updateData = {
-        // Core project data
-        name: extractedData.name || project.name,
+        // Core project data - PROTECT project name from financial data override
+        name: (extractedData.name && extractedData.name.includes && !extractedData.name.includes('SPO') && !extractedData.name.includes('1515172')) 
+              ? extractedData.name 
+              : project.name,
         approvedTPC: extractedData.approvedTPC,
         totalBudget: extractedData.totalBudget,
         currentYearCashflow: extractedData.currentYearCashflow,
