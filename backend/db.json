@@ -8,7 +8,7 @@
       "submissions": 12,
       "status": "Active",
       "reportStatus": "Update Required",
-      "description": "Test",
+      "description": "Complete renovation of elementary school facilities including classroom upgrades and safety improvements",
       "phase": "Construction",
       "region": "Calgary",
       "location": "123 School Street, Calgary, AB T2P 1A1",
@@ -44,8 +44,7 @@
       "seniorPmReviewed": false,
       "ownerId": 1,
       "createdAt": "2024-03-01T08:00:00.000Z",
-      "updatedAt": "2025-06-13T15:36:21.385Z",
-      "endDate": ""
+      "updatedAt": "2024-06-12T10:30:00.000Z"
     },
     {
       "id": "77:24:B1",

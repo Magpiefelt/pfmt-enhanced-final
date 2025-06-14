@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button.jsx'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { Badge } from '@/components/ui/badge.jsx'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table.jsx'
-import { Eye, Edit, FileText, Calendar, DollarSign, MapPin, Users } from 'lucide-react'
+import { Eye, Edit, FileText, Calendar, DollarSign, MapPin, Users, Target } from 'lucide-react'
 import { formatCurrency, formatDate, getStatusColor } from '../../utils/index.js'
 import { useProjects } from '../../hooks/index.js'
 import { LoadingSpinner, ErrorMessage, EmptyState } from '../shared/Layout.jsx'
@@ -145,6 +145,13 @@ export function ProjectCard({ project, onSelect }) {
               <span className="text-sm text-gray-600">Budget:</span>
               <Badge className={getStatusColor(project.budgetStatus)}>
                 {project.budgetStatus}
+              </Badge>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Target className="h-4 w-4 text-gray-600" />
+              <span className="text-sm text-gray-600">Scope:</span>
+              <Badge className={getStatusColor(project.scopeStatus || 'On Track')}>
+                {project.scopeStatus || 'On Track'}
               </Badge>
             </div>
             <Button variant="outline" size="sm" className="w-full">

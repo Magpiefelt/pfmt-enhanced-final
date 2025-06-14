@@ -403,11 +403,26 @@ export default function ProjectsPage() {
   const [selectedProject, setSelectedProject] = useState(null)
   const [showPFMTUpload, setShowPFMTUpload] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
-  const { updateProject } = useProjects()
+  const { projects, updateProject } = useProjects()
   const { showSuccess, showError } = useNotifications()
 
   // Get filter from URL params
   const filterFromUrl = searchParams.get('filter') || 'all'
+  const newProjectId = searchParams.get('newProjectId')
+  
+  // Auto-select new project if coming from PFMT creation
+  useEffect(() => {
+    if (newProjectId && projects.length > 0) {
+      const newProject = projects.find(p => p.id === parseInt(newProjectId))
+      if (newProject) {
+        setSelectedProject(newProject)
+        // Clear the URL parameter
+        const newSearchParams = new URLSearchParams(searchParams)
+        newSearchParams.delete('newProjectId')
+        setSearchParams(newSearchParams, { replace: true })
+      }
+    }
+  }, [newProjectId, projects, searchParams, setSearchParams])
   
   // Set filter in store when component mounts or URL changes
   useEffect(() => {

@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert.jsx'
 import { Badge } from '@/components/ui/badge.jsx'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table.jsx'
 import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, X } from 'lucide-react'
+import { PFMT_FIELD_MAPPING, ALTERNATIVE_MAPPINGS, FIELD_VALIDATION, DEFAULT_VALUES, PROJECT_INFO_MAPPING, BUDGET_CATEGORIES_MAPPING } from '../utils/pfmtMapping.js'
 
 // PFMT Data Extractor Component
 export function PFMTDataExtractor({ project, onDataExtracted, onClose }) {
@@ -77,13 +78,16 @@ export function PFMTDataExtractor({ project, onDataExtracted, onClose }) {
       // Extract data from SP Fields sheet
       const spFieldsSheet = workbook.Sheets['SP Fields']
       
-      // Extract key financial data from known cell locations
+      // Enhanced extraction using mapping configuration
       const extractedData = {
         // Primary financial fields from SP Fields sheet
         taf: getCellValue(spFieldsSheet, 'B2'), // Total Approved Funding
         eac: getCellValue(spFieldsSheet, 'B6'), // Estimate at Completion
         currentYearCashflow: getCellValue(spFieldsSheet, 'B4'), // Current Year Cashflow Total
         currentYearTarget: getCellValue(spFieldsSheet, 'B7'), // Current Year Target
+        
+        // Auto-populate all mapped fields
+        ...extractMappedFields(spFieldsSheet),
         
         // Additional fields for validation
         projectId: getCellValue(spFieldsSheet, 'B1'), // Project ID if available
@@ -118,18 +122,117 @@ export function PFMTDataExtractor({ project, onDataExtracted, onClose }) {
     }
   }
 
-  // Helper function to get cell value safely
+  // Helper function to extract cell value safely
   const getCellValue = (sheet, cellAddress) => {
     const cell = sheet[cellAddress]
     if (!cell) return null
     
     // Handle different cell types
-    if (cell.t === 'n') return cell.v // Number
-    if (cell.t === 's') return cell.v // String
-    if (cell.t === 'b') return cell.v // Boolean
-    if (cell.t === 'd') return cell.v // Date
+    if (cell.t === 'n') return cell.v // number
+    if (cell.t === 's') return cell.v // string
+    if (cell.t === 'b') return cell.v // boolean
+    if (cell.t === 'd') return cell.v // date
     
     return cell.v
+  }
+
+  // Enhanced field extraction using mapping configuration
+  const extractMappedFields = (sheet) => {
+    const mappedData = {}
+    
+    // Extract fields using primary mapping from SP Fields sheet
+    Object.entries(PFMT_FIELD_MAPPING).forEach(([cellAddress, fieldName]) => {
+      let value = getCellValue(sheet, cellAddress)
+      
+      // Validate and convert field types
+      if (value && FIELD_VALIDATION[fieldName]) {
+        value = validateAndConvertField(value, FIELD_VALIDATION[fieldName])
+      }
+      
+      if (value !== null && value !== undefined && value !== '') {
+        mappedData[fieldName] = value
+      }
+    })
+    
+    // Extract project info from other sheets if available
+    const workbook = sheet.parent
+    Object.entries(PROJECT_INFO_MAPPING).forEach(([sheetCell, fieldName]) => {
+      const [sheetName, cellAddress] = sheetCell.split('!')
+      if (workbook.sheetNames.includes(sheetName)) {
+        const targetSheet = workbook.getWorksheet(sheetName)
+        let value = getCellValue(targetSheet, cellAddress)
+        
+        if (value !== null && value !== undefined && value !== '') {
+          mappedData[fieldName] = value
+        }
+      }
+    })
+    
+    // Extract budget categories from Summary sheet if available
+    if (workbook.sheetNames.includes('Summary (Rpt)')) {
+      const summarySheet = workbook.getWorksheet('Summary (Rpt)')
+      Object.entries(BUDGET_CATEGORIES_MAPPING).forEach(([sheetCell, fieldName]) => {
+        const cellAddress = sheetCell.split('!')[1]
+        let value = getCellValue(summarySheet, cellAddress)
+        
+        if (value && FIELD_VALIDATION[fieldName]) {
+          value = validateAndConvertField(value, FIELD_VALIDATION[fieldName])
+        }
+        
+        if (value !== null && value !== undefined && value !== '') {
+          mappedData[fieldName] = value
+        }
+      })
+    }
+    
+    // Try alternative locations for key fields
+    Object.entries(ALTERNATIVE_MAPPINGS).forEach(([fieldName, altCells]) => {
+      if (!mappedData[fieldName]) {
+        for (const altCell of altCells) {
+          let value
+          if (altCell.includes('!')) {
+            const [sheetName, cellAddress] = altCell.split('!')
+            if (workbook.sheetNames.includes(sheetName)) {
+              const targetSheet = workbook.getWorksheet(sheetName)
+              value = getCellValue(targetSheet, cellAddress)
+            }
+          } else {
+            value = getCellValue(sheet, altCell)
+          }
+          
+          if (value) {
+            mappedData[fieldName] = value
+            break
+          }
+        }
+      }
+    })
+    
+    // Apply default values if still empty
+    Object.entries(DEFAULT_VALUES).forEach(([fieldName, defaultValue]) => {
+      if (!mappedData[fieldName]) {
+        mappedData[fieldName] = defaultValue
+      }
+    })
+    
+    return mappedData
+  }
+
+  // Field validation and conversion
+  const validateAndConvertField = (value, type) => {
+    switch (type) {
+      case 'number':
+        const numValue = parseFloat(value)
+        return isNaN(numValue) ? 0 : numValue
+      case 'currency':
+        const currValue = parseFloat(value)
+        return isNaN(currValue) ? 0 : currValue
+      case 'percentage':
+        const pctValue = parseFloat(value)
+        return isNaN(pctValue) ? 0 : (pctValue > 1 ? pctValue / 100 : pctValue) // Convert to decimal if needed
+      default:
+        return value
+    }
   }
 
   // Validate extracted data
@@ -188,7 +291,7 @@ export function PFMTDataExtractor({ project, onDataExtracted, onClose }) {
   const handleImportData = () => {
     if (extractedData && validationResults?.isValid) {
       onDataExtracted(extractedData)
-      onClose()
+      // Don't call onClose here - let the parent handle navigation
     }
   }
 

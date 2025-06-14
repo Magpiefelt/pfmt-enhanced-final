@@ -51,14 +51,14 @@ export class ProjectService {
   // Create new project
   static createProject(projectData) {
     // Validate required fields
-    const requiredFields = ['name', 'description']
+    const requiredFields = ['name']
     for (const field of requiredFields) {
       if (!projectData[field]) {
         throw new Error(`Missing required field: ${field}`)
       }
     }
     
-    // Set default values
+    // Set default values with all new fields
     const defaultProject = {
       status: 'Active',
       reportStatus: 'Update Required',
@@ -70,8 +70,9 @@ export class ProjectService {
       eac: 0,
       currentYearCashflow: 0,
       targetCashflow: 0,
-      scheduleStatus: 'Green',
-      budgetStatus: 'Green',
+      scheduleStatus: 'On Track',
+      budgetStatus: 'On Track',
+      scopeStatus: 'On Track',
       scheduleReasonCode: '',
       budgetReasonCode: '',
       monthlyComments: '',
@@ -88,12 +89,59 @@ export class ProjectService {
       lastPfmtUpdate: null,
       pfmtFileName: null,
       pfmtExtractedAt: null,
-      additionalTeam: []
+      additionalTeam: [],
+      
+      // New Project Details fields
+      category: '',
+      clientMinistry: '',
+      projectType: '',
+      deliveryType: '',
+      deliveryMethod: '',
+      branch: '',
+      geographicRegion: '',
+      description: '',
+      squareMeters: '',
+      numberOfStructures: '',
+      numberOfJobs: '',
+      
+      // New Project Location fields
+      location: '',
+      municipality: '',
+      projectAddress: '',
+      constituency: '',
+      buildingName: '',
+      buildingType: '',
+      buildingId: '',
+      primaryOwner: '',
+      plan: '',
+      block: '',
+      lot: '',
+      latitude: '',
+      longitude: '',
+      
+      // Project milestones by phase
+      milestones: {
+        Planning: {},
+        Design: {},
+        Construction: {},
+        Closeout: {}
+      },
+      
+      // Project team and vendors
+      team: [],
+      vendors: [],
+      
+      // Metadata
+      createdAt: new Date().toISOString(),
+      lastUpdated: new Date().toISOString(),
+      createdFrom: 'Manual',
+      originalFileName: null
     }
     
     const newProject = {
       ...defaultProject,
-      ...projectData
+      ...projectData,
+      lastUpdated: new Date().toISOString()
     }
     
     return db.createProject(newProject)
@@ -106,7 +154,13 @@ export class ProjectService {
       throw new Error('Project not found')
     }
     
-    return db.updateProject(id, updates)
+    // Add lastUpdated timestamp to all updates
+    const updatesWithTimestamp = {
+      ...updates,
+      lastUpdated: new Date().toISOString()
+    }
+    
+    return db.updateProject(id, updatesWithTimestamp)
   }
   
   // Delete project

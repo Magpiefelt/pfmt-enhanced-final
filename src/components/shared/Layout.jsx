@@ -20,7 +20,7 @@ export function Header({ onRoleChange }) {
     <header className="bg-white border-b border-gray-200 px-6 py-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <img src={albertaLogo} alt="Alberta Government" className="h-8 w-auto" />
+          <img src={albertaLogo} alt="Alberta Government" className="h-24 w-auto" />
           <div>
             <h1 className="text-xl font-semibold text-gray-900">
               Project Financial Management Tool

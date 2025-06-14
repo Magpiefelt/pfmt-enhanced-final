@@ -73,12 +73,12 @@ export class ProjectController {
     try {
       const projectData = req.body
       
-      // Validate required fields
-      if (!projectData.name || !projectData.description) {
+      // Validate required fields - only name is required now
+      if (!projectData.name) {
         return res.status(400).json({
           success: false,
           error: 'Missing required fields',
-          message: 'Name and description are required'
+          message: 'Project name is required'
         })
       }
       

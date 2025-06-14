@@ -8,6 +8,7 @@ import { ProjectList } from './components/projects/ProjectList.jsx'
 import { ProjectManagerDashboard } from './components/projects/AddNewProject.jsx'
 import { useAuth, usePFMTExtractor } from './hooks/index.js'
 import ProjectsPage from './pages/ProjectsPage.jsx'
+import PFMTExtractorPage from './pages/PFMTExtractorPage.jsx'
 import './App.css'
 
 // Home page with navigation tiles
@@ -30,15 +31,15 @@ function HomePage() {
       filter: 'all',
       roles: ['spm', 'director', 'admin']
     },
+    // { 
+    //   title: 'Gate Meetings', 
+    //   description: 'Schedule and manage gate meetings', 
+    //   path: '/meetings',
+    //   roles: ['pm', 'spm', 'director', 'admin']
+    // },
     { 
-      title: 'Gate Meetings', 
-      description: 'Schedule and manage gate meetings', 
-      path: '/meetings',
-      roles: ['pm', 'spm', 'director', 'admin']
-    },
-    { 
-      title: 'PFMT Library', 
-      description: 'Access PFMT templates and resources', 
+      title: 'Create New Project', 
+      description: 'Upload PFMT Excel to create a project', 
       path: '/library',
       roles: ['pm', 'spm', 'director', 'admin', 'vendor']
     },
@@ -137,48 +138,6 @@ function StaffPortal() {
   }
   
   return <HomePage />
-}
-
-// PFMT Extractor Page
-function PFMTExtractorPage() {
-  const [selectedProject, setSelectedProject] = useState(null)
-  const [extractedData, setExtractedData] = useState(null)
-
-  const handleDataExtracted = (data) => {
-    setExtractedData(data)
-    // Here you could integrate with the project creation workflow
-    console.log('Extracted PFMT data:', data)
-  }
-
-  return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">PFMT Data Extractor</h1>
-        <p className="text-gray-600">
-          Upload and extract data from PFMT Excel files to create new projects or update existing ones.
-        </p>
-      </div>
-      
-      <div className="max-w-4xl">
-        <PFMTDataExtractor
-          project={selectedProject}
-          onDataExtracted={handleDataExtracted}
-          onClose={() => setSelectedProject(null)}
-        />
-      </div>
-      
-      {extractedData && (
-        <div className="mt-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Extracted Data Preview</h2>
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <pre className="text-sm overflow-auto">
-              {JSON.stringify(extractedData, null, 2)}
-            </pre>
-          </div>
-        </div>
-      )}
-    </div>
-  )
 }
 
 // Main app content component
