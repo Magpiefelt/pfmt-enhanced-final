@@ -1,25 +1,52 @@
-// Project service layer for business logic
+// Enhanced Project service layer for comprehensive PFMT Excel processing
 import * as db from './database.js'
 import * as XLSX from 'xlsx'
 import fs from 'fs/promises'
 
 export class ProjectService {
-  // Get all projects with pagination and filtering
+  // Get all projects with pagination and filtering - Enhanced for proper visibility
   static getProjects(options = {}) {
     const {
       page = 1,
       limit = 10,
       ownerId,
       status,
-      reportStatus
+      reportStatus,
+      userId,
+      userRole
     } = options
     
-    // Get filtered projects
-    const allProjects = db.getAllProjects({
-      ownerId,
+    // Enhanced filtering for role-based access
+    const filterOptions = {
       status,
       reportStatus
-    })
+    }
+    
+    // Apply role-based filtering
+    if (userId && userRole) {
+      const role = userRole.toLowerCase()
+      
+      if (role === 'admin' || role === 'director') {
+        // Admin and directors see all projects, apply additional filters if specified
+        if (ownerId) filterOptions.ownerId = ownerId
+      } else if (role === 'project manager' || role === 'senior project manager' || role === 'pm') {
+        // Project managers see projects they own or manage
+        filterOptions.userId = userId
+        filterOptions.userRole = role
+        
+        // If specific ownerId is requested, use it (for filtering)
+        if (ownerId) filterOptions.ownerId = ownerId
+      } else {
+        // Other roles only see their own projects
+        filterOptions.ownerId = userId
+      }
+    } else if (ownerId) {
+      // If no user context but ownerId specified, use it
+      filterOptions.ownerId = ownerId
+    }
+    
+    // Get filtered projects
+    const allProjects = db.getAllProjects(filterOptions)
     
     // Calculate pagination
     const total = allProjects.length
@@ -58,17 +85,29 @@ export class ProjectService {
       }
     }
     
-    // Set default values with all new fields
+    // Set default values with enhanced structure
     const defaultProject = {
+      // Basic Information
       status: 'Active',
       reportStatus: 'Update Required',
       phase: 'Planning',
-      submissions: 0,
+      category: '',
+      deliveryMethod: '',
+      description: '',
+      
+      // Financial Data
+      approvedTPC: 0,
       totalBudget: 0,
-      amountSpent: 0,
-      taf: 0,
       eac: 0,
+      taf: 0,
+      amountSpent: 0,
       currentYearCashflow: 0,
+      futureYearCashflow: 0,
+      currentYearBudgetTarget: 0,
+      currentYearApprovedTarget: 0,
+      
+      // Legacy fields for backward compatibility
+      submissions: 0,
       targetCashflow: 0,
       scheduleStatus: 'On Track',
       budgetStatus: 'On Track',
@@ -86,26 +125,14 @@ export class ProjectService {
       approvedDate: null,
       directorApproved: false,
       seniorPmReviewed: false,
-      lastPfmtUpdate: null,
-      pfmtFileName: null,
-      pfmtExtractedAt: null,
-      additionalTeam: [],
       
-      // New Project Details fields
-      category: '',
+      // Project Details
+      projectManager: '',
+      primeContractor: '',
       clientMinistry: '',
       projectType: '',
-      deliveryType: '',
-      deliveryMethod: '',
       branch: '',
       geographicRegion: '',
-      description: '',
-      squareMeters: '',
-      numberOfStructures: '',
-      numberOfJobs: '',
-      
-      // New Project Location fields
-      location: '',
       municipality: '',
       projectAddress: '',
       constituency: '',
@@ -118,6 +145,16 @@ export class ProjectService {
       lot: '',
       latitude: '',
       longitude: '',
+      squareMeters: '',
+      numberOfStructures: '',
+      numberOfJobs: '',
+      
+      // Array fields
+      fundingLines: [],
+      vendors: [],
+      changeOrders: [],
+      additionalTeam: [],
+      programs: [],
       
       // Project milestones by phase
       milestones: {
@@ -127,9 +164,10 @@ export class ProjectService {
         Closeout: {}
       },
       
-      // Project team and vendors
-      team: [],
-      vendors: [],
+      // PFMT metadata
+      lastPfmtUpdate: null,
+      pfmtFileName: null,
+      pfmtExtractedAt: null,
       
       // Metadata
       createdAt: new Date().toISOString(),
@@ -173,120 +211,195 @@ export class ProjectService {
     return db.deleteProject(id)
   }
   
-  // Process Excel file upload
-  static async processExcelUpload(projectId, filePath, fileName) {
-    try {
-      // Verify project exists
-      const project = db.getProjectById(projectId)
-      if (!project) {
-        throw new Error('Project not found')
-      }
+  // Helper function to safely get cell value
+  static getCellValue(worksheet, cellAddress) {
+    const cell = worksheet[cellAddress]
+    if (!cell) return null
+    
+    // Handle different cell types
+    if (cell.t === 'n') return cell.v // number
+    if (cell.t === 's') return cell.v // string
+    if (cell.t === 'b') return cell.v // boolean
+    if (cell.t === 'd') return cell.v // date
+    
+    return cell.v
+  }
+  
+  // Helper function to convert string to number safely
+  static toNumber(value, defaultValue = 0) {
+    if (value === null || value === undefined || value === '') return defaultValue
+    if (typeof value === 'number') return value
+    
+    const numValue = parseFloat(value)
+    return isNaN(numValue) ? defaultValue : numValue
+  }
+  
+  // Process SP Fields sheet
+  static processSPFields(worksheet) {
+    const spData = {}
+    
+    // Read key-value pairs from SP Fields sheet
+    // Assuming format: Column A = Field, Column B = Value
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:B20')
+    
+    for (let row = range.s.r; row <= range.e.r; row++) {
+      const fieldCell = worksheet[XLSX.utils.encode_cell({r: row, c: 0})]
+      const valueCell = worksheet[XLSX.utils.encode_cell({r: row, c: 1})]
       
-      // Read and parse Excel file
-      const workbook = XLSX.readFile(filePath)
-      
-      // Look for the "SP Fields" sheet or use the first sheet
-      let sheetName = 'SP Fields'
-      if (!workbook.SheetNames.includes(sheetName)) {
-        sheetName = workbook.SheetNames[0]
-        if (!sheetName) {
-          throw new Error('No worksheets found in Excel file')
-        }
-      }
-      
-      const worksheet = workbook.Sheets[sheetName]
-      
-      // Helper function to safely get cell value
-      const getCellValue = (cellAddress) => {
-        const cell = worksheet[cellAddress]
-        if (!cell) return null
+      if (fieldCell && valueCell) {
+        const field = fieldCell.v
+        const value = valueCell.v
         
-        // Handle different cell types
-        if (cell.t === 'n') return cell.v // number
-        if (cell.t === 's') return cell.v // string
-        if (cell.t === 'b') return cell.v // boolean
-        if (cell.t === 'd') return cell.v // date
-        
-        return cell.v
-      }
-      
-      // Extract financial data from specific cells
-      // These cell addresses should match the PFMT template structure
-      const extractedData = {
-        taf: getCellValue('C5') || 0, // Total Approved Funding
-        eac: getCellValue('C6') || 0, // Estimate at Completion
-        currentYearCashflow: getCellValue('C7') || 0, // Current Year Cashflow
-        currentYearTarget: getCellValue('C8') || 0, // Current Year Target
-        // Add more fields as needed based on PFMT template
-      }
-      
-      // Validate extracted data
-      const numericFields = ['taf', 'eac', 'currentYearCashflow', 'currentYearTarget']
-      for (const field of numericFields) {
-        if (extractedData[field] && typeof extractedData[field] !== 'number') {
-          // Try to convert to number
-          const numValue = parseFloat(extractedData[field])
-          if (!isNaN(numValue)) {
-            extractedData[field] = numValue
-          } else {
-            extractedData[field] = 0
-          }
+        if (field && value !== undefined) {
+          spData[field] = value
         }
       }
-      
-      // Calculate variances
-      const tafEacVariance = extractedData.eac - extractedData.taf
-      const cashflowVariance = extractedData.currentYearCashflow - extractedData.currentYearTarget
-      
-      // Prepare update data
-      const updateData = {
-        taf: extractedData.taf,
-        eac: extractedData.eac,
-        currentYearCashflow: extractedData.currentYearCashflow,
-        targetCashflow: extractedData.currentYearTarget, // Use consistent field name
-        lastPfmtUpdate: new Date().toISOString(),
-        pfmtFileName: fileName,
-        pfmtExtractedAt: new Date().toISOString(),
-        reportStatus: 'Current', // Update status to indicate current data
-        // Store calculated variances if needed
-        tafEacVariance,
-        cashflowVariance
-      }
-      
-      // Update project with extracted data
-      const updatedProject = db.updateProject(projectId, updateData)
-      
-      // Clean up uploaded file
-      try {
-        await fs.unlink(filePath)
-      } catch (cleanupError) {
-        console.warn('Failed to clean up uploaded file:', cleanupError)
-      }
-      
-      return {
-        project: updatedProject,
-        extractedData: {
-          ...extractedData,
-          tafEacVariance,
-          cashflowVariance,
-          fileName,
-          extractedAt: updateData.pfmtExtractedAt
-        }
-      }
-      
-    } catch (error) {
-      // Clean up uploaded file on error
-      try {
-        await fs.unlink(filePath)
-      } catch (cleanupError) {
-        console.warn('Failed to clean up uploaded file after error:', cleanupError)
-      }
-      
-      throw error
+    }
+    
+    return {
+      approvedTPC: this.toNumber(spData.SPOApprovedTPC),
+      totalBudget: this.toNumber(spData.SPOBudgetTotal),
+      currentYearCashflow: this.toNumber(spData.SPOCashflowCurrentYearTotal),
+      futureYearCashflow: this.toNumber(spData.SPOCashflowFutureYearTotal)
     }
   }
-
-  // Process PFMT Excel file upload with enhanced data extraction
+  
+  // Process SP Fund Src sheet
+  static processSPFundSrc(worksheet) {
+    const fundingData = XLSX.utils.sheet_to_json(worksheet, { 
+      header: 1, 
+      defval: "",
+      range: 1 // Skip header row
+    })
+    
+    const fundingLines = []
+    
+    for (const row of fundingData) {
+      if (row[0] && row[0] !== '--') { // Skip empty or placeholder rows
+        fundingLines.push({
+          source: row[0] || '',
+          description: row[1] || '',
+          capitalPlanLine: row[2] || '',
+          approvedValue: this.toNumber(row[3]),
+          currentYearBudget: this.toNumber(row[4]),
+          currentYearApproved: this.toNumber(row[5])
+        })
+      }
+    }
+    
+    return fundingLines
+  }
+  
+  // Process FundingLines Lookup sheet
+  static processFundingLinesLookup(worksheet) {
+    const fundingData = XLSX.utils.sheet_to_json(worksheet, { 
+      header: 1, 
+      defval: "",
+      range: 1 // Skip header row
+    })
+    
+    const fundingLines = []
+    
+    for (const row of fundingData) {
+      if (row[0]) { // WBS column
+        fundingLines.push({
+          wbs: row[0] || '',
+          description: row[1] || '',
+          fundingLine: row[2] || '',
+          fundingDescription: row[3] || '',
+          projectId: row[4] || ''
+        })
+      }
+    }
+    
+    return fundingLines
+  }
+  
+  // Process Change Tracking sheet
+  static processChangeTracking(worksheet) {
+    const changeData = XLSX.utils.sheet_to_json(worksheet, { 
+      header: 9, // Header is on row 9 based on analysis
+      defval: ""
+    })
+    
+    const changeOrders = []
+    
+    for (const row of changeData) {
+      if (row['Vendor / Org.']) {
+        changeOrders.push({
+          vendor: row['Vendor / Org.'] || '',
+          contractId: row['Contract ID'] || '',
+          status: row['Change Status'] || '',
+          approvedDate: row['Approved Date'] || '',
+          value: this.toNumber(row['Change Value']),
+          referenceNumber: row['Reference #'] || '',
+          reasonCode: row['Reason Code'] || '',
+          description: row['Description'] || '',
+          notes: row['Notes'] || ''
+        })
+      }
+    }
+    
+    return changeOrders
+  }
+  
+  // Process Cost Tracking sheet
+  static processCostTracking(worksheet) {
+    const costData = XLSX.utils.sheet_to_json(worksheet, { 
+      header: 4, // Header is on row 4 based on analysis
+      defval: ""
+    })
+    
+    const vendors = []
+    
+    for (const row of costData) {
+      if (row['Vendor / Org.']) {
+        vendors.push({
+          name: row['Vendor / Org.'] || '',
+          currentCommitment: this.toNumber(row['Current Commitment']),
+          billedToDate: this.toNumber(row['Billed to Date']),
+          percentSpent: this.toNumber(row['% Spent']),
+          holdback: this.toNumber(row['Holdback']),
+          latestCostDate: row['Latest Cost Date'] || '',
+          cashflowTotal: this.toNumber(row['Cashflow Total']),
+          cmsValue: this.toNumber(row['CMS Value']),
+          cmsAsOfDate: row['CMS As of Date'] || '',
+          variance: this.toNumber(row['Variance'])
+        })
+      }
+    }
+    
+    return vendors
+  }
+  
+  // Process Prime Contractor Summary sheet
+  static processPrimeContractorSummary(worksheet) {
+    // Look for specific cells containing prime contractor info
+    const primeContractor = this.getCellValue(worksheet, 'B3') || '' // Adjust cell reference as needed
+    const deliveryMethod = this.getCellValue(worksheet, 'C2') || ''
+    
+    return {
+      primeContractor,
+      deliveryMethod
+    }
+  }
+  
+  // Process Validations sheet for project setup data
+  static processValidations(worksheet) {
+    const validationData = {}
+    
+    // Look for project title
+    const projectTitle = this.getCellValue(worksheet, 'B5') || ''
+    
+    // Look for other validation data
+    // This would need to be customized based on the actual structure
+    
+    return {
+      name: projectTitle
+    }
+  }
+  
+  // Enhanced PFMT Excel processing with comprehensive field mapping
   static async processPFMTExcelUpload(projectId, filePath, fileName) {
     try {
       // Verify project exists
@@ -295,105 +408,115 @@ export class ProjectService {
         throw new Error('Project not found')
       }
       
-      // Read and parse Excel file
-      const workbook = XLSX.readFile(filePath)
+      // Read and parse Excel file with enhanced options
+      const workbook = XLSX.readFile(filePath, { 
+        sheetStubs: true,
+        defval: "",
+        cellDates: true
+      })
       
-      // Look for the "SP Fields" sheet or use the first sheet
-      let sheetName = 'SP Fields'
-      if (!workbook.SheetNames.includes(sheetName)) {
-        sheetName = workbook.SheetNames[0]
-        if (!sheetName) {
-          throw new Error('No worksheets found in Excel file')
-        }
-      }
+      console.log('Available sheets:', workbook.SheetNames)
       
-      const worksheet = workbook.Sheets[sheetName]
-      
-      // Helper function to safely get cell value
-      const getCellValue = (cellAddress) => {
-        const cell = worksheet[cellAddress]
-        if (!cell) return null
+      // Initialize extracted data
+      let extractedData = {
+        // Basic fields
+        name: project.name,
+        approvedTPC: 0,
+        totalBudget: 0,
+        currentYearCashflow: 0,
+        futureYearCashflow: 0,
         
-        // Handle different cell types
-        if (cell.t === 'n') return cell.v // number
-        if (cell.t === 's') return cell.v // string
-        if (cell.t === 'b') return cell.v // boolean
-        if (cell.t === 'd') return cell.v // date
-        
-        return cell.v
-      }
-      
-      // Extract comprehensive PFMT data
-      const pfmtData = {
-        // Financial data
-        taf: getCellValue('C5') || 0,
-        eac: getCellValue('C6') || 0,
-        currentYearCashflow: getCellValue('C7') || 0,
-        currentYearTarget: getCellValue('C8') || 0,
-        amountSpent: getCellValue('C9') || 0,
-        
-        // Project information
-        projectName: getCellValue('C2') || project.name,
-        contractor: getCellValue('C3') || project.contractor,
-        projectManager: getCellValue('C4') || project.projectManager,
-        
-        // Status information
-        scheduleStatus: getCellValue('C10') || 'Green',
-        budgetStatus: getCellValue('C11') || 'Green',
-        scheduleReasonCode: getCellValue('C12') || '',
-        budgetReasonCode: getCellValue('C13') || '',
-        
-        // Comments and explanations
-        monthlyComments: getCellValue('C14') || '',
-        previousHighlights: getCellValue('C15') || '',
-        nextSteps: getCellValue('C16') || '',
-        budgetVarianceExplanation: getCellValue('C17') || '',
-        cashflowVarianceExplanation: getCellValue('C18') || '',
+        // Arrays
+        fundingLines: [],
+        vendors: [],
+        changeOrders: [],
         
         // Metadata
         extractedAt: new Date().toISOString(),
         fileName: fileName,
-        sheetName: sheetName
+        sheetsProcessed: []
       }
       
-      // Validate and convert numeric fields
-      const numericFields = ['taf', 'eac', 'currentYearCashflow', 'currentYearTarget', 'amountSpent']
-      for (const field of numericFields) {
-        if (pfmtData[field] && typeof pfmtData[field] !== 'number') {
-          const numValue = parseFloat(pfmtData[field])
-          if (!isNaN(numValue)) {
-            pfmtData[field] = numValue
-          } else {
-            pfmtData[field] = 0
-          }
-        }
+      // Process SP Fields sheet (highest priority)
+      if (workbook.SheetNames.includes('SP Fields')) {
+        console.log('Processing SP Fields sheet...')
+        const spFieldsData = this.processSPFields(workbook.Sheets['SP Fields'])
+        extractedData = { ...extractedData, ...spFieldsData }
+        extractedData.sheetsProcessed.push('SP Fields')
       }
       
-      // Calculate variances
-      const tafEacVariance = pfmtData.eac - pfmtData.taf
-      const cashflowVariance = pfmtData.currentYearCashflow - pfmtData.currentYearTarget
-      const budgetUtilization = pfmtData.taf > 0 ? (pfmtData.amountSpent / pfmtData.taf) * 100 : 0
+      // Process SP Fund Src sheet
+      if (workbook.SheetNames.includes('SP Fund Src')) {
+        console.log('Processing SP Fund Src sheet...')
+        const fundingSrcData = this.processSPFundSrc(workbook.Sheets['SP Fund Src'])
+        extractedData.fundingLines = [...extractedData.fundingLines, ...fundingSrcData]
+        extractedData.sheetsProcessed.push('SP Fund Src')
+      }
+      
+      // Process FundingLines Lookup sheet
+      if (workbook.SheetNames.includes('FundingLines Lookup')) {
+        console.log('Processing FundingLines Lookup sheet...')
+        const fundingLookupData = this.processFundingLinesLookup(workbook.Sheets['FundingLines Lookup'])
+        // Merge with existing funding lines or create separate array
+        extractedData.fundingLinesLookup = fundingLookupData
+        extractedData.sheetsProcessed.push('FundingLines Lookup')
+      }
+      
+      // Process Change Tracking sheet
+      if (workbook.SheetNames.includes('Change Tracking')) {
+        console.log('Processing Change Tracking sheet...')
+        const changeData = this.processChangeTracking(workbook.Sheets['Change Tracking'])
+        extractedData.changeOrders = changeData
+        extractedData.sheetsProcessed.push('Change Tracking')
+      }
+      
+      // Process Cost Tracking sheet
+      if (workbook.SheetNames.includes('Cost Tracking')) {
+        console.log('Processing Cost Tracking sheet...')
+        const vendorData = this.processCostTracking(workbook.Sheets['Cost Tracking'])
+        extractedData.vendors = vendorData
+        extractedData.sheetsProcessed.push('Cost Tracking')
+      }
+      
+      // Process Prime Contractor Summary sheet
+      if (workbook.SheetNames.includes('Prime Cont. Summary')) {
+        console.log('Processing Prime Cont. Summary sheet...')
+        const primeContractorData = this.processPrimeContractorSummary(workbook.Sheets['Prime Cont. Summary'])
+        extractedData = { ...extractedData, ...primeContractorData }
+        extractedData.sheetsProcessed.push('Prime Cont. Summary')
+      }
+      
+      // Process Validations sheet
+      if (workbook.SheetNames.includes('Validations')) {
+        console.log('Processing Validations sheet...')
+        const validationData = this.processValidations(workbook.Sheets['Validations'])
+        extractedData = { ...extractedData, ...validationData }
+        extractedData.sheetsProcessed.push('Validations')
+      }
+      
+      // Calculate derived values
+      const tafEacVariance = extractedData.eac - extractedData.taf
+      const cashflowVariance = extractedData.currentYearCashflow - extractedData.currentYearBudgetTarget
+      const budgetUtilization = extractedData.totalBudget > 0 ? 
+        (extractedData.amountSpent / extractedData.totalBudget) * 100 : 0
       
       // Prepare comprehensive update data
       const updateData = {
-        // Update project fields with PFMT data
-        name: pfmtData.projectName,
-        contractor: pfmtData.contractor,
-        projectManager: pfmtData.projectManager,
-        taf: pfmtData.taf,
-        eac: pfmtData.eac,
-        currentYearCashflow: pfmtData.currentYearCashflow,
-        targetCashflow: pfmtData.currentYearTarget,
-        amountSpent: pfmtData.amountSpent,
-        scheduleStatus: pfmtData.scheduleStatus,
-        budgetStatus: pfmtData.budgetStatus,
-        scheduleReasonCode: pfmtData.scheduleReasonCode,
-        budgetReasonCode: pfmtData.budgetReasonCode,
-        monthlyComments: pfmtData.monthlyComments,
-        previousHighlights: pfmtData.previousHighlights,
-        nextSteps: pfmtData.nextSteps,
-        budgetVarianceExplanation: pfmtData.budgetVarianceExplanation,
-        cashflowVarianceExplanation: pfmtData.cashflowVarianceExplanation,
+        // Core project data
+        name: extractedData.name || project.name,
+        approvedTPC: extractedData.approvedTPC,
+        totalBudget: extractedData.totalBudget,
+        currentYearCashflow: extractedData.currentYearCashflow,
+        futureYearCashflow: extractedData.futureYearCashflow,
+        
+        // Contractor and delivery info
+        primeContractor: extractedData.primeContractor || project.primeContractor,
+        deliveryMethod: extractedData.deliveryMethod || project.deliveryMethod,
+        
+        // Array data
+        fundingLines: extractedData.fundingLines,
+        vendors: extractedData.vendors,
+        changeOrders: extractedData.changeOrders,
         
         // PFMT metadata
         lastPfmtUpdate: new Date().toISOString(),
@@ -402,7 +525,7 @@ export class ProjectService {
         reportStatus: 'Current',
         
         // Store complete PFMT data for future reference
-        pfmtData: pfmtData,
+        pfmtData: extractedData,
         
         // Calculated values
         tafEacVariance,
@@ -423,13 +546,14 @@ export class ProjectService {
       return {
         project: updatedProject,
         extractedData: {
+          ...extractedData,
           tafEacVariance,
           cashflowVariance,
           budgetUtilization,
           fileName,
           extractedAt: updateData.pfmtExtractedAt
         },
-        pfmtData: pfmtData
+        pfmtData: extractedData
       }
       
     } catch (error) {
@@ -442,6 +566,12 @@ export class ProjectService {
       
       throw error
     }
+  }
+  
+  // Legacy Excel processing for backward compatibility
+  static async processExcelUpload(projectId, filePath, fileName) {
+    // Use the enhanced PFMT processing for all Excel uploads
+    return this.processPFMTExcelUpload(projectId, filePath, fileName)
   }
 }
 

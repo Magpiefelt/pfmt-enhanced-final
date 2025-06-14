@@ -10,23 +10,84 @@
       "reportStatus": "Update Required",
       "description": "Complete renovation of elementary school facilities including classroom upgrades and safety improvements",
       "phase": "Construction",
-      "region": "Calgary",
-      "location": "123 School Street, Calgary, AB T2P 1A1",
+      "category": "Education",
       "deliveryMethod": "Design-Build",
       "projectManager": "Sarah Johnson",
       "seniorProjectManager": "Michael Brown",
       "director": "Lisa Wilson",
-      "additionalTeam": [
-        "John Doe - Engineer",
-        "Jane Smith - Architect"
-      ],
+      "primeContractor": "ABC Construction Ltd.",
+      "clientMinistry": "Education",
+      "projectType": "Renovation",
+      "branch": "Infrastructure",
+      "geographicRegion": "Calgary",
+      "municipality": "Calgary",
+      "projectAddress": "123 School Street, Calgary, AB T2P 1A1",
+      "constituency": "Calgary-Centre",
+      "buildingName": "Calgary Elementary School",
+      "buildingType": "Educational Facility",
+      "buildingId": "EDU-001",
+      "primaryOwner": "Alberta Education",
+      "squareMeters": "2500",
+      "numberOfStructures": "1",
+      "numberOfJobs": "15",
+      "approvedTPC": 2450000,
       "totalBudget": 2450000,
       "amountSpent": 1680000,
       "taf": 2450000,
       "eac": 2520000,
       "currentYearCashflow": 1200000,
+      "futureYearCashflow": 1250000,
+      "currentYearBudgetTarget": 1150000,
+      "currentYearApprovedTarget": 1200000,
       "targetCashflow": 1150000,
-      "lastPfmtUpdate": null,
+      "fundingLines": [
+        {
+          "source": "P-002360",
+          "description": "General Facilities Infrastructure",
+          "capitalPlanLine": "Calgary Elementary School Renovation",
+          "approvedValue": 2450000,
+          "currentYearBudget": 1150000,
+          "currentYearApproved": 1200000,
+          "projectId": "B0536D-0010",
+          "wbs": "P-002360"
+        }
+      ],
+      "vendors": [
+        {
+          "name": "ABC Construction Ltd.",
+          "contractId": "CON-001",
+          "currentCommitment": 2200000,
+          "billedToDate": 1680000,
+          "percentSpent": 76.4,
+          "holdback": 168000,
+          "latestCostDate": "2024-06-01",
+          "cashflowTotal": 1200000,
+          "cmsValue": 2200000,
+          "cmsAsOfDate": "2024-06-01",
+          "variance": 50000
+        }
+      ],
+      "changeOrders": [
+        {
+          "vendor": "ABC Construction Ltd.",
+          "contractId": "CON-001",
+          "status": "Approved",
+          "approvedDate": "2024-05-15",
+          "value": 70000,
+          "referenceNumber": "CO-001",
+          "reasonCode": "Material Supply Delays",
+          "description": "Additional steel reinforcement due to supply chain issues",
+          "notes": "Approved by project manager and client"
+        }
+      ],
+      "additionalTeam": [
+        "John Doe - Engineer",
+        "Jane Smith - Architect"
+      ],
+      "programs": [
+        "Capital Infrastructure Program"
+      ],
+      "lastPfmtUpdate": "2024-06-12T10:30:00Z",
       "scheduleStatus": "Green",
       "budgetStatus": "Yellow",
       "scheduleReasonCode": "",
@@ -42,9 +103,48 @@
       "approvedDate": null,
       "directorApproved": false,
       "seniorPmReviewed": false,
+      "milestones": {
+        "Planning": {
+          "Design Approval": {
+            "completed": true,
+            "date": "2024-02-15"
+          },
+          "Permits Obtained": {
+            "completed": true,
+            "date": "2024-03-01"
+          }
+        },
+        "Design": {
+          "Schematic Design": {
+            "completed": true,
+            "date": "2024-01-30"
+          },
+          "Design Development": {
+            "completed": true,
+            "date": "2024-02-28"
+          }
+        },
+        "Construction": {
+          "Foundation Complete": {
+            "completed": true,
+            "date": "2024-04-15"
+          },
+          "Framing Complete": {
+            "completed": false,
+            "date": null
+          }
+        },
+        "Closeout": {}
+      },
       "ownerId": 1,
       "createdAt": "2024-03-01T08:00:00.000Z",
-      "updatedAt": "2024-06-12T10:30:00.000Z"
+      "updatedAt": "2024-06-12T10:30:00.000Z",
+      "lastUpdated": "2024-06-12T10:30:00.000Z",
+      "createdFrom": "Manual",
+      "originalFileName": null,
+      "pfmtFileName": null,
+      "pfmtExtractedAt": null,
+      "pfmtData": null
     },
     {
       "id": "77:24:B1",
@@ -56,22 +156,71 @@
       "reportStatus": "Current",
       "description": "New wing addition to Edmonton General Hospital with specialized medical equipment installation",
       "phase": "Design Development",
-      "region": "Edmonton",
-      "location": "456 Health Avenue, Edmonton, AB T5K 2M3",
+      "category": "Healthcare",
       "deliveryMethod": "Traditional",
       "projectManager": "Michael Brown",
       "seniorProjectManager": "Lisa Wilson",
       "director": "David Chen",
-      "additionalTeam": [
-        "Dr. Sarah Lee - Medical Consultant",
-        "Tom Wilson - MEP Engineer"
-      ],
+      "primeContractor": "MediConstruct Inc.",
+      "clientMinistry": "Health",
+      "projectType": "Addition",
+      "branch": "Healthcare Infrastructure",
+      "geographicRegion": "Edmonton",
+      "municipality": "Edmonton",
+      "projectAddress": "456 Health Avenue, Edmonton, AB T5K 2M3",
+      "constituency": "Edmonton-Centre",
+      "buildingName": "Edmonton General Hospital",
+      "buildingType": "Healthcare Facility",
+      "buildingId": "HLT-002",
+      "primaryOwner": "Alberta Health Services",
+      "squareMeters": "5000",
+      "numberOfStructures": "1",
+      "numberOfJobs": "25",
+      "approvedTPC": 5200000,
       "totalBudget": 5200000,
       "amountSpent": 1560000,
       "taf": 5200000,
       "eac": 5100000,
       "currentYearCashflow": 2100000,
+      "futureYearCashflow": 3000000,
+      "currentYearBudgetTarget": 2200000,
+      "currentYearApprovedTarget": 2100000,
       "targetCashflow": 2200000,
+      "fundingLines": [
+        {
+          "source": "P-002361",
+          "description": "Healthcare Infrastructure",
+          "capitalPlanLine": "Edmonton Hospital Wing Addition",
+          "approvedValue": 5200000,
+          "currentYearBudget": 2200000,
+          "currentYearApproved": 2100000,
+          "projectId": "B0068AE-0030",
+          "wbs": "P-002361"
+        }
+      ],
+      "vendors": [
+        {
+          "name": "MediConstruct Inc.",
+          "contractId": "CON-002",
+          "currentCommitment": 4800000,
+          "billedToDate": 1560000,
+          "percentSpent": 32.5,
+          "holdback": 156000,
+          "latestCostDate": "2024-05-15",
+          "cashflowTotal": 2100000,
+          "cmsValue": 4800000,
+          "cmsAsOfDate": "2024-05-15",
+          "variance": -100000
+        }
+      ],
+      "changeOrders": [],
+      "additionalTeam": [
+        "Dr. Sarah Lee - Medical Consultant",
+        "Tom Wilson - MEP Engineer"
+      ],
+      "programs": [
+        "Healthcare Capital Program"
+      ],
       "lastPfmtUpdate": "2024-05-15T10:30:00Z",
       "scheduleStatus": "Green",
       "budgetStatus": "Green",
@@ -88,57 +237,125 @@
       "approvedDate": "2024-05-21T09:15:00Z",
       "directorApproved": true,
       "seniorPmReviewed": true,
-      "pfmtFileName": "Edmonton-Hospital-PFMT-May2024.xlsx",
-      "pfmtExtractedAt": "2024-05-15T10:30:00Z",
+      "milestones": {
+        "Planning": {
+          "Feasibility Study": {
+            "completed": true,
+            "date": "2023-12-15"
+          },
+          "Environmental Assessment": {
+            "completed": true,
+            "date": "2024-01-05"
+          }
+        },
+        "Design": {
+          "Schematic Design": {
+            "completed": true,
+            "date": "2024-02-28"
+          },
+          "Design Development": {
+            "completed": true,
+            "date": "2024-04-30"
+          }
+        },
+        "Construction": {},
+        "Closeout": {}
+      },
       "ownerId": 2,
       "createdAt": "2024-01-01T08:00:00.000Z",
-      "updatedAt": "2024-05-21T09:15:00.000Z"
+      "updatedAt": "2024-05-21T09:15:00.000Z",
+      "lastUpdated": "2024-05-21T09:15:00.000Z",
+      "createdFrom": "PFMT Upload",
+      "originalFileName": "Edmonton-Hospital-PFMT-May2024.xlsx",
+      "pfmtFileName": "Edmonton-Hospital-PFMT-May2024.xlsx",
+      "pfmtExtractedAt": "2024-05-15T10:30:00Z",
+      "pfmtData": {
+        "sheetsProcessed": [
+          "SP Fields",
+          "SP Fund Src",
+          "Cost Tracking"
+        ],
+        "extractedAt": "2024-05-15T10:30:00Z"
+      }
     },
     {
-      "id": "99:48:C7",
-      "name": "Red Deer Community Center",
-      "contractor": "Community Builders Ltd.",
-      "startDate": "2024-02-20",
-      "submissions": 15,
+      "id": "673860e8-800d-49fb-815d-e44b494af4ba",
       "status": "Active",
-      "reportStatus": "Review Required",
-      "description": "Multi-purpose community center with gymnasium, meeting rooms, and recreational facilities",
-      "phase": "Construction",
-      "region": "Red Deer",
-      "location": "789 Community Drive, Red Deer, AB T4N 1A5",
-      "deliveryMethod": "Design-Build",
-      "projectManager": "Sarah Johnson",
-      "seniorProjectManager": "Michael Brown",
-      "director": "Lisa Wilson",
-      "additionalTeam": [
-        "Mark Thompson - Structural Engineer",
-        "Lisa Chen - Interior Designer"
-      ],
-      "totalBudget": 3800000,
-      "amountSpent": 2280000,
-      "taf": 3800000,
-      "eac": 3950000,
-      "currentYearCashflow": 1900000,
-      "targetCashflow": 1800000,
-      "lastPfmtUpdate": null,
-      "scheduleStatus": "Yellow",
-      "budgetStatus": "Red",
-      "scheduleReasonCode": "Weather Delays",
-      "budgetReasonCode": "Change Orders",
-      "monthlyComments": "Weather delays in March affected schedule. Additional change orders for accessibility improvements",
-      "previousHighlights": "Structural work completed",
-      "nextSteps": "Interior finishing and equipment installation",
-      "budgetVarianceExplanation": "Client requested additional accessibility features adding $150K to budget",
-      "cashflowVarianceExplanation": "Accelerated payments to maintain schedule",
+      "reportStatus": "Current",
+      "phase": "Planning",
+      "category": "",
+      "deliveryMethod": "",
+      "description": "",
+      "approvedTPC": 0,
+      "totalBudget": 191100000,
+      "eac": 191099999.8800001,
+      "taf": 191100000,
+      "amountSpent": 0,
+      "currentYearCashflow": 1515171.99,
+      "futureYearCashflow": 0,
+      "currentYearBudgetTarget": 0,
+      "currentYearApprovedTarget": 0,
+      "submissions": 0,
+      "targetCashflow": 1515172.2300000004,
+      "scheduleStatus": "On Track",
+      "budgetStatus": "On Track",
+      "scopeStatus": "On Track",
+      "scheduleReasonCode": "",
+      "budgetReasonCode": "",
+      "monthlyComments": "",
+      "previousHighlights": "",
+      "nextSteps": "",
+      "budgetVarianceExplanation": "",
+      "cashflowVarianceExplanation": "",
       "submittedBy": null,
       "submittedDate": null,
       "approvedBy": null,
       "approvedDate": null,
       "directorApproved": false,
       "seniorPmReviewed": false,
-      "ownerId": 1,
-      "createdAt": "2024-02-15T08:00:00.000Z",
-      "updatedAt": "2024-06-10T14:20:00.000Z"
+      "projectManager": "TBD",
+      "primeContractor": "",
+      "clientMinistry": "",
+      "projectType": "",
+      "branch": "",
+      "geographicRegion": "",
+      "municipality": "",
+      "projectAddress": "",
+      "constituency": "",
+      "buildingName": "",
+      "buildingType": "",
+      "buildingId": "",
+      "primaryOwner": "",
+      "plan": "",
+      "block": "",
+      "lot": "",
+      "latitude": "",
+      "longitude": "",
+      "squareMeters": "",
+      "numberOfStructures": "",
+      "numberOfJobs": "",
+      "fundingLines": [],
+      "vendors": [],
+      "changeOrders": [],
+      "additionalTeam": [],
+      "programs": [],
+      "milestones": {},
+      "lastPfmtUpdate": null,
+      "pfmtFileName": null,
+      "pfmtExtractedAt": null,
+      "createdAt": "2025-06-14T19:48:08.072Z",
+      "lastUpdated": "2025-06-14T19:48:08.072Z",
+      "createdFrom": "PFMT Excel Upload",
+      "originalFileName": "RDJC-AI-FIN-XX-TRK-PFMT v3.0.xlsm",
+      "name": "1515172.2300000004",
+      "deliveryType": "",
+      "location": "",
+      "contractor": "TBD",
+      "region": "TBD",
+      "startDate": "2025-06-14",
+      "endDate": "",
+      "team": [],
+      "updatedAt": "2025-06-14T19:48:08.072Z"
     }
   ],
   "users": [

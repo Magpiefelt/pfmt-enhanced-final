@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input.jsx'
 import { Label } from '@/components/ui/label.jsx'
 import { Textarea } from '@/components/ui/textarea.jsx'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs.jsx'
+import { VendorsTab } from './VendorsTab.jsx'
 import { 
   MapPin, 
   DollarSign, 
@@ -472,17 +473,18 @@ export function ProjectMilestonesEnhanced({ project, onUpdate, isEditing = false
   )
 }
 
-// Enhanced Project Overview Component that integrates all sections
+// Enhanced Project Overview Component that integrates all sections including Vendors
 export function ProjectOverview({ project, onUpdate, isEditing = false }) {
   const [activeTab, setActiveTab] = useState('overview')
 
   return (
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="details">Details</TabsTrigger>
           <TabsTrigger value="location">Location</TabsTrigger>
+          <TabsTrigger value="vendors">Vendors</TabsTrigger>
           <TabsTrigger value="milestones">Milestones</TabsTrigger>
         </TabsList>
         
@@ -589,6 +591,10 @@ export function ProjectOverview({ project, onUpdate, isEditing = false }) {
         
         <TabsContent value="location">
           <ProjectLocation project={project} onUpdate={onUpdate} isEditing={isEditing} />
+        </TabsContent>
+        
+        <TabsContent value="vendors">
+          <VendorsTab project={project} onUpdate={onUpdate} isEditing={isEditing} />
         </TabsContent>
         
         <TabsContent value="milestones">

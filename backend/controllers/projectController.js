@@ -1,9 +1,9 @@
-// Project controller for handling HTTP requests
+// Enhanced Project controller for handling HTTP requests with fixed permissions
 import { ProjectService } from '../services/projectService.js'
 import { UserService } from '../services/userService.js'
 
 export class ProjectController {
-  // GET /api/projects
+  // GET /api/projects - Fixed to ensure project managers can see their projects
   static async getAllProjects(req, res) {
     try {
       const {
@@ -19,17 +19,56 @@ export class ProjectController {
         limit: parseInt(limit)
       }
       
-      // Add filters if provided
-      if (ownerId) options.ownerId = ownerId
-      if (status) options.status = status
-      if (reportStatus) options.reportStatus = reportStatus
+      // Enhanced filtering logic to fix visibility issues
+      // If user is authenticated, apply role-based filtering
+      if (req.user) {
+        const userRole = req.user.role?.toLowerCase()
+        const userId = req.user.id
+        
+        // Admin users can see all projects
+        if (userRole === 'admin' || userRole === 'director') {
+          // Apply any additional filters if provided
+          if (ownerId) options.ownerId = ownerId
+          if (status) options.status = status
+          if (reportStatus) options.reportStatus = reportStatus
+        }
+        // Project managers and senior project managers can see their own projects
+        else if (userRole === 'project manager' || userRole === 'senior project manager' || userRole === 'pm') {
+          // Show projects where user is the owner, project manager, or senior project manager
+          options.userId = userId
+          options.userRole = userRole
+          
+          // Apply additional filters if provided
+          if (status) options.status = status
+          if (reportStatus) options.reportStatus = reportStatus
+          
+          // Don't override ownerId filter if user is trying to filter by specific owner
+          if (ownerId) options.ownerId = ownerId
+        }
+        // Other roles get limited access
+        else {
+          options.ownerId = userId
+          if (status) options.status = status
+          if (reportStatus) options.reportStatus = reportStatus
+        }
+      } else {
+        // If no user context, apply basic filters
+        if (ownerId) options.ownerId = ownerId
+        if (status) options.status = status
+        if (reportStatus) options.reportStatus = reportStatus
+      }
       
       const result = ProjectService.getProjects(options)
       
       res.json({
         success: true,
         data: result.projects,
-        pagination: result.pagination
+        pagination: result.pagination,
+        userContext: req.user ? {
+          id: req.user.id,
+          role: req.user.role,
+          name: req.user.name
+        } : null
       })
     } catch (error) {
       console.error('Error getting projects:', error)
@@ -54,6 +93,43 @@ export class ProjectController {
         })
       }
       
+      // Check if user has permission to view this project
+      if (req.user) {
+        const userRole = req.user.role?.toLowerCase()
+        const userId = req.user.id
+        
+        // Admin and directors can view all projects
+        if (userRole === 'admin' || userRole === 'director') {
+          // Allow access
+        }
+        // Project managers can view projects they own or manage
+        else if (userRole === 'project manager' || userRole === 'senior project manager' || userRole === 'pm') {
+          const hasAccess = (
+            project.ownerId === userId ||
+            project.projectManager === req.user.name ||
+            project.seniorProjectManager === req.user.name
+          )
+          
+          if (!hasAccess) {
+            return res.status(403).json({
+              success: false,
+              error: 'Access denied',
+              message: 'You do not have permission to view this project'
+            })
+          }
+        }
+        // Other roles can only view their own projects
+        else {
+          if (project.ownerId !== userId) {
+            return res.status(403).json({
+              success: false,
+              error: 'Access denied',
+              message: 'You do not have permission to view this project'
+            })
+          }
+        }
+      }
+      
       res.json({
         success: true,
         data: project
@@ -68,7 +144,7 @@ export class ProjectController {
     }
   }
   
-  // POST /api/projects
+  // POST /api/projects - Enhanced to ensure proper ownership assignment
   static async createProject(req, res) {
     try {
       const projectData = req.body
@@ -80,6 +156,24 @@ export class ProjectController {
           error: 'Missing required fields',
           message: 'Project name is required'
         })
+      }
+      
+      // Ensure proper ownership assignment
+      if (req.user) {
+        // Set the creator as the owner if not specified
+        if (!projectData.ownerId) {
+          projectData.ownerId = req.user.id
+        }
+        
+        // Set project manager if not specified and user is a PM
+        if (!projectData.projectManager && 
+            (req.user.role?.toLowerCase() === 'project manager' || req.user.role?.toLowerCase() === 'pm')) {
+          projectData.projectManager = req.user.name
+        }
+        
+        // Add creation metadata
+        projectData.createdBy = req.user.name
+        projectData.createdByUserId = req.user.id
       }
       
       const newProject = ProjectService.createProject(projectData)
@@ -99,11 +193,61 @@ export class ProjectController {
     }
   }
   
-  // PUT /api/projects/:id
+  // PUT /api/projects/:id - Enhanced with permission checks
   static async updateProject(req, res) {
     try {
       const { id } = req.params
       const updates = req.body
+      
+      // Get existing project to check permissions
+      const existingProject = ProjectService.getProjectById(id)
+      if (!existingProject) {
+        return res.status(404).json({
+          success: false,
+          error: 'Project not found'
+        })
+      }
+      
+      // Check if user has permission to update this project
+      if (req.user) {
+        const userRole = req.user.role?.toLowerCase()
+        const userId = req.user.id
+        
+        // Admin and directors can update all projects
+        if (userRole === 'admin' || userRole === 'director') {
+          // Allow update
+        }
+        // Project managers can update projects they own or manage
+        else if (userRole === 'project manager' || userRole === 'senior project manager' || userRole === 'pm') {
+          const hasAccess = (
+            existingProject.ownerId === userId ||
+            existingProject.projectManager === req.user.name ||
+            existingProject.seniorProjectManager === req.user.name
+          )
+          
+          if (!hasAccess) {
+            return res.status(403).json({
+              success: false,
+              error: 'Access denied',
+              message: 'You do not have permission to update this project'
+            })
+          }
+        }
+        // Other roles can only update their own projects
+        else {
+          if (existingProject.ownerId !== userId) {
+            return res.status(403).json({
+              success: false,
+              error: 'Access denied',
+              message: 'You do not have permission to update this project'
+            })
+          }
+        }
+        
+        // Add update metadata
+        updates.lastUpdatedBy = req.user.name
+        updates.lastUpdatedByUserId = req.user.id
+      }
       
       const updatedProject = ProjectService.updateProject(id, updates)
       
@@ -130,10 +274,48 @@ export class ProjectController {
     }
   }
   
-  // DELETE /api/projects/:id
+  // DELETE /api/projects/:id - Enhanced with permission checks
   static async deleteProject(req, res) {
     try {
       const { id } = req.params
+      
+      // Get existing project to check permissions
+      const existingProject = ProjectService.getProjectById(id)
+      if (!existingProject) {
+        return res.status(404).json({
+          success: false,
+          error: 'Project not found'
+        })
+      }
+      
+      // Check if user has permission to delete this project
+      if (req.user) {
+        const userRole = req.user.role?.toLowerCase()
+        const userId = req.user.id
+        
+        // Only admin and directors can delete projects
+        if (userRole === 'admin' || userRole === 'director') {
+          // Allow deletion
+        }
+        // Project managers can delete their own projects only
+        else if (userRole === 'project manager' || userRole === 'senior project manager' || userRole === 'pm') {
+          if (existingProject.ownerId !== userId) {
+            return res.status(403).json({
+              success: false,
+              error: 'Access denied',
+              message: 'Only administrators can delete projects'
+            })
+          }
+        }
+        // Other roles cannot delete projects
+        else {
+          return res.status(403).json({
+            success: false,
+            error: 'Access denied',
+            message: 'You do not have permission to delete projects'
+          })
+        }
+      }
       
       ProjectService.deleteProject(id)
       
@@ -159,7 +341,7 @@ export class ProjectController {
     }
   }
   
-  // POST /api/projects/:id/excel
+  // POST /api/projects/:id/excel - Enhanced with permission checks
   static async uploadExcel(req, res) {
     try {
       const { id } = req.params
@@ -170,6 +352,51 @@ export class ProjectController {
           error: 'No file uploaded',
           message: 'Please select an Excel file to upload'
         })
+      }
+      
+      // Check if user has permission to upload to this project
+      const existingProject = ProjectService.getProjectById(id)
+      if (!existingProject) {
+        return res.status(404).json({
+          success: false,
+          error: 'Project not found'
+        })
+      }
+      
+      if (req.user) {
+        const userRole = req.user.role?.toLowerCase()
+        const userId = req.user.id
+        
+        // Admin and directors can upload to all projects
+        if (userRole === 'admin' || userRole === 'director') {
+          // Allow upload
+        }
+        // Project managers can upload to projects they own or manage
+        else if (userRole === 'project manager' || userRole === 'senior project manager' || userRole === 'pm') {
+          const hasAccess = (
+            existingProject.ownerId === userId ||
+            existingProject.projectManager === req.user.name ||
+            existingProject.seniorProjectManager === req.user.name
+          )
+          
+          if (!hasAccess) {
+            return res.status(403).json({
+              success: false,
+              error: 'Access denied',
+              message: 'You do not have permission to upload files to this project'
+            })
+          }
+        }
+        // Other roles can only upload to their own projects
+        else {
+          if (existingProject.ownerId !== userId) {
+            return res.status(403).json({
+              success: false,
+              error: 'Access denied',
+              message: 'You do not have permission to upload files to this project'
+            })
+          }
+        }
       }
       
       const result = await ProjectService.processExcelUpload(
@@ -210,7 +437,7 @@ export class ProjectController {
     }
   }
 
-  // POST /api/projects/:id/pfmt-excel
+  // POST /api/projects/:id/pfmt-excel - Enhanced with permission checks
   static async uploadPFMTExcel(req, res) {
     try {
       const { id } = req.params
@@ -221,6 +448,51 @@ export class ProjectController {
           error: 'No file uploaded',
           message: 'Please select a PFMT Excel file to upload'
         })
+      }
+      
+      // Check if user has permission to upload to this project
+      const existingProject = ProjectService.getProjectById(id)
+      if (!existingProject) {
+        return res.status(404).json({
+          success: false,
+          error: 'Project not found'
+        })
+      }
+      
+      if (req.user) {
+        const userRole = req.user.role?.toLowerCase()
+        const userId = req.user.id
+        
+        // Admin and directors can upload to all projects
+        if (userRole === 'admin' || userRole === 'director') {
+          // Allow upload
+        }
+        // Project managers can upload to projects they own or manage
+        else if (userRole === 'project manager' || userRole === 'senior project manager' || userRole === 'pm') {
+          const hasAccess = (
+            existingProject.ownerId === userId ||
+            existingProject.projectManager === req.user.name ||
+            existingProject.seniorProjectManager === req.user.name
+          )
+          
+          if (!hasAccess) {
+            return res.status(403).json({
+              success: false,
+              error: 'Access denied',
+              message: 'You do not have permission to upload files to this project'
+            })
+          }
+        }
+        // Other roles can only upload to their own projects
+        else {
+          if (existingProject.ownerId !== userId) {
+            return res.status(403).json({
+              success: false,
+              error: 'Access denied',
+              message: 'You do not have permission to upload files to this project'
+            })
+          }
+        }
       }
       
       const result = await ProjectService.processPFMTExcelUpload(
