@@ -1,4 +1,4 @@
-// Fixed ProjectsPage with Proper Data Flow and Navigation
+// COMPLETE FIXED ProjectsPage.jsx - Integrates with existing structure
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ProjectList } from '../components/projects/ProjectList.jsx'
@@ -51,6 +51,9 @@ const mockProjects = [
     lot: 'Lot 5',
     latitude: 51.0447,
     longitude: -114.0719,
+    taf: 2450000,
+    eac: 2400000,
+    currentYearCashflow: 500000,
     milestones: {
       projectInitiation: { plannedDate: '2024-01-15', actualDate: '2024-01-15', baselineDate: '2024-01-15' },
       siteMobilization: { plannedDate: '2024-03-01', actualDate: '2024-03-05', baselineDate: '2024-03-01' },
@@ -92,6 +95,9 @@ const mockProjects = [
     lot: 'Lot 10',
     latitude: 52.2681,
     longitude: -113.8112,
+    taf: 3800000,
+    eac: 3750000,
+    currentYearCashflow: 800000,
     milestones: {
       projectInitiation: { plannedDate: '2024-01-01', actualDate: '2024-01-01', baselineDate: '2024-01-01' },
       designKickoff: { plannedDate: '2024-02-01', actualDate: '2024-02-05', baselineDate: '2024-02-01' },
@@ -162,6 +168,7 @@ export default function ProjectsPage() {
     setIsEditing(false)
   }
 
+  // FIXED: Enhanced PFMT data extraction handler
   const handlePFMTDataExtracted = (data) => {
     console.log('PFMT Data extracted:', data)
     
@@ -169,15 +176,23 @@ export default function ProjectsPage() {
       // Update existing project with extracted data
       const updatedProject = {
         ...selectedProject,
-        // Map Excel data to project fields
-        name: data['Project Name'] || selectedProject.name,
+        // Map Excel data to project fields with safe string handling
+        name: data['Project Name'] || data.projectName || selectedProject.name,
         description: data.description || selectedProject.description,
-        totalBudget: data.taf || data.totalBudget || selectedProject.totalBudget,
-        amountSpent: data.totalExpenditures || selectedProject.amountSpent,
-        currentYearCashflow: data.currentYearCashflow || selectedProject.currentYearCashflow,
-        eac: data.eac || selectedProject.eac,
         
-        // Enhanced fields from PFMT data
+        // Financial data mapping
+        totalBudget: data.taf || data.totalBudget || selectedProject.totalBudget,
+        taf: data.taf || selectedProject.taf,
+        eac: data.eac || selectedProject.eac,
+        amountSpent: data.totalExpenditures || data.amountSpent || selectedProject.amountSpent,
+        currentYearCashflow: data.currentYearCashflow || selectedProject.currentYearCashflow,
+        currentYearTarget: data.currentYearTarget || selectedProject.currentYearTarget,
+        futureYearCashflow: data.futureYearCashflow || selectedProject.futureYearCashflow,
+        previousYearsTargets: data.previousYearsTargets || selectedProject.previousYearsTargets,
+        percentCompleteTAF: data.percentCompleteTAF || selectedProject.percentCompleteTAF,
+        percentCompleteEAC: data.percentCompleteEAC || selectedProject.percentCompleteEAC,
+        
+        // Project details mapping
         category: data.category || data['Project Category'] || selectedProject.category,
         clientMinistry: data.clientMinistry || data['Client Ministry'] || selectedProject.clientMinistry,
         projectType: data.projectType || data['Project Type'] || selectedProject.projectType,
@@ -189,7 +204,7 @@ export default function ProjectsPage() {
         numberOfStructures: data.numberOfStructures || data['Number of Structures'] || selectedProject.numberOfStructures,
         numberOfJobs: data.numberOfJobs || data['Number of Jobs'] || selectedProject.numberOfJobs,
         
-        // Location fields
+        // Location fields mapping
         municipality: data.municipality || data['Municipality'] || selectedProject.municipality,
         projectAddress: data.projectAddress || data['Project Address'] || selectedProject.projectAddress,
         constituency: data.constituency || data['Constituency'] || selectedProject.constituency,
@@ -203,18 +218,12 @@ export default function ProjectsPage() {
         latitude: data.latitude || data['Latitude'] || selectedProject.latitude,
         longitude: data.longitude || data['Longitude'] || selectedProject.longitude,
         
-        // Financial data
-        taf: data.taf || selectedProject.taf,
-        currentYearTarget: data.currentYearTarget || selectedProject.currentYearTarget,
-        futureYearCashflow: data.futureYearCashflow || selectedProject.futureYearCashflow,
-        previousYearsTargets: data.previousYearsTargets || selectedProject.previousYearsTargets,
-        percentCompleteTAF: data.percentCompleteTAF || selectedProject.percentCompleteTAF,
-        percentCompleteEAC: data.percentCompleteEAC || selectedProject.percentCompleteEAC,
-        
         // Metadata
         lastUpdated: new Date().toISOString(),
         extractedFrom: data.fileName || 'PFMT Excel Upload'
       }
+
+      console.log('Updating existing project with Excel data:', updatedProject)
 
       // Update project in list
       setProjects(prev => prev.map(p => p.id === selectedProject.id ? updatedProject : p))
@@ -224,21 +233,22 @@ export default function ProjectsPage() {
       // Create new project with extracted data
       const newProject = {
         id: Date.now(), // Simple ID generation
-        name: data['Project Name'] || `Project ${Date.now()}`,
+        name: data['Project Name'] || data.projectName || `Project ${Date.now()}`,
         description: data.description || 'Project created from PFMT Excel upload',
-        totalBudget: data.taf || data.totalBudget || 0,
-        amountSpent: data.totalExpenditures || 0,
-        currentYearCashflow: data.currentYearCashflow || 0,
-        eac: data.eac || 0,
-        phase: 'Planning',
-        status: 'Active',
-        contractor: 'TBD',
-        projectManager: currentUser.name, // Assign to current user
-        createdBy: currentUser.id, // Track creator
-        location: data.location || 'TBD',
-        startDate: new Date().toISOString().split('T')[0],
         
-        // Enhanced fields from PFMT data
+        // Financial data
+        totalBudget: data.taf || data.totalBudget || 0,
+        taf: data.taf || 0,
+        eac: data.eac || 0,
+        amountSpent: data.totalExpenditures || data.amountSpent || 0,
+        currentYearCashflow: data.currentYearCashflow || 0,
+        currentYearTarget: data.currentYearTarget || 0,
+        futureYearCashflow: data.futureYearCashflow || 0,
+        previousYearsTargets: data.previousYearsTargets || 0,
+        percentCompleteTAF: data.percentCompleteTAF || 0,
+        percentCompleteEAC: data.percentCompleteEAC || 0,
+        
+        // Project details
         category: data.category || data['Project Category'] || 'Infrastructure',
         clientMinistry: data.clientMinistry || data['Client Ministry'] || 'Infrastructure',
         projectType: data.projectType || data['Project Type'] || 'New Construction',
@@ -251,6 +261,7 @@ export default function ProjectsPage() {
         numberOfJobs: data.numberOfJobs || data['Number of Jobs'] || 0,
         
         // Location fields
+        location: data.location || data.municipality || 'TBD',
         municipality: data.municipality || data['Municipality'] || '',
         projectAddress: data.projectAddress || data['Project Address'] || '',
         constituency: data.constituency || data['Constituency'] || '',
@@ -264,33 +275,32 @@ export default function ProjectsPage() {
         latitude: data.latitude || data['Latitude'] || '',
         longitude: data.longitude || data['Longitude'] || '',
         
-        // Financial data
-        taf: data.taf || 0,
-        currentYearTarget: data.currentYearTarget || 0,
-        futureYearCashflow: data.futureYearCashflow || 0,
-        previousYearsTargets: data.previousYearsTargets || 0,
-        percentCompleteTAF: data.percentCompleteTAF || 0,
-        percentCompleteEAC: data.percentCompleteEAC || 0,
+        // Standard project fields
+        phase: 'Planning',
+        status: 'Active',
+        contractor: 'TBD',
+        projectManager: currentUser.name, // FIXED: Assign to current user
+        createdBy: currentUser.id, // FIXED: Track creator for visibility
+        startDate: new Date().toISOString().split('T')[0],
         
         // Metadata
         createdAt: new Date().toISOString(),
-        lastUpdated: data.lastUpdated || new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
         extractedFrom: data.fileName || 'PFMT Excel Upload',
         
         // Initialize empty milestones
         milestones: {}
       }
 
+      console.log('Creating new project with Excel data:', newProject)
+
       // Add to projects list
       setProjects(prev => [newProject, ...prev])
       
-      // Navigate to new project profile immediately
+      // FIXED: Navigate to new project profile immediately
       setSelectedProject(newProject)
       
-      // Update URL to show we're viewing the new project
-      const newSearchParams = new URLSearchParams(searchParams)
-      newSearchParams.set('newProject', newProject.id.toString())
-      navigate(`/projects?${newSearchParams.toString()}`, { replace: true })
+      console.log('New project created and selected for viewing')
     }
     
     // Close extractor
@@ -333,6 +343,9 @@ export default function ProjectsPage() {
               <h1 className="text-2xl font-bold text-gray-900">{selectedProject.name}</h1>
               <p className="text-gray-600">
                 {selectedProject.contractor} • {selectedProject.phase} • {selectedProject.location}
+                {selectedProject.extractedFrom && (
+                  <span className="ml-2 text-blue-600">• Data from: {selectedProject.extractedFrom}</span>
+                )}
               </p>
             </div>
           </div>
@@ -378,9 +391,9 @@ export default function ProjectsPage() {
           </div>
         </div>
 
-        {/* Project Overview with all components */}
+        {/* FIXED: Project Overview with proper data binding */}
         <ProjectOverview 
-          project={selectedProject} 
+          project={selectedProject}
           onUpdate={handleProjectUpdate}
           isEditing={isEditing}
         />
@@ -397,33 +410,74 @@ export default function ProjectsPage() {
     )
   }
 
+  // Project list view
   return (
     <div className="p-6">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          {filter === 'my' ? 'My Projects' : 'All Projects'}
-        </h1>
-        <p className="text-gray-600">
-          {filter === 'my' ? 
-            'Manage and track your assigned projects' :
-            'Browse all projects in the system'
-          }
-        </p>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Projects</h1>
+          <p className="text-gray-600 mt-1">
+            Manage and track your infrastructure projects
+            {filter === 'my' && ` • Showing projects for ${currentUser.name}`}
+          </p>
+        </div>
         
-        {/* User role info for debugging */}
-        <div className="mt-2 text-sm text-gray-500">
-          Logged in as: {currentUser.name} ({currentUser.role}) | Showing {filteredProjects.length} projects
+        <div className="flex items-center space-x-3">
+          <Button
+            variant="outline"
+            onClick={() => setShowPFMTExtractor(true)}
+            className="flex items-center space-x-2"
+          >
+            <Upload className="h-4 w-4" />
+            <span>Create New Project</span>
+          </Button>
         </div>
       </div>
 
-      <ProjectList
+      {/* Filter tabs */}
+      <div className="flex space-x-1 mb-6">
+        <Button
+          variant={filter === 'all' ? 'default' : 'outline'}
+          onClick={() => {
+            const newSearchParams = new URLSearchParams(searchParams)
+            newSearchParams.set('filter', 'all')
+            navigate(`/projects?${newSearchParams.toString()}`)
+          }}
+          size="sm"
+        >
+          All Projects ({projects.length})
+        </Button>
+        <Button
+          variant={filter === 'my' ? 'default' : 'outline'}
+          onClick={() => {
+            const newSearchParams = new URLSearchParams(searchParams)
+            newSearchParams.set('filter', 'my')
+            navigate(`/projects?${newSearchParams.toString()}`)
+          }}
+          size="sm"
+        >
+          My Projects ({filteredProjects.length})
+        </Button>
+      </div>
+
+      {/* Project List */}
+      <ProjectList 
         projects={paginatedProjects}
         onProjectSelect={handleProjectSelect}
         currentPage={currentPage}
         totalPages={totalPages}
         onPageChange={setCurrentPage}
-        filter={filter}
       />
+
+      {/* PFMT Data Extractor Modal for new projects */}
+      {showPFMTExtractor && (
+        <PFMTDataExtractor
+          project={null} // null for new project creation
+          onDataExtracted={handlePFMTDataExtracted}
+          onClose={() => setShowPFMTExtractor(false)}
+        />
+      )}
     </div>
   )
 }
