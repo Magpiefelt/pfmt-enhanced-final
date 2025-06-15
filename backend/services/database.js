@@ -449,20 +449,40 @@ export function getProjectById(id) {
 export function createProject(projectData, userContext = null) {
   db.read()
   
+  console.log('=== Database createProject (ENHANCED) ===')
+  console.log('Project data:', JSON.stringify(projectData, null, 2))
+  console.log('User context:', JSON.stringify(userContext, null, 2))
+  
   const newProject = {
     id: uuidv4(),
     ...projectData,
-    // Ensure proper user context is set for visibility
+    // ENHANCED: Ensure proper user context is set for visibility
     createdByUserId: userContext?.id || projectData.createdByUserId || projectData.ownerId,
     ownerId: projectData.ownerId || userContext?.id,
+    createdBy: userContext?.id || projectData.createdBy,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     lastUpdated: new Date().toISOString()
   }
   
-  db.data.projects = db.data.projects || []
+  // CRITICAL: Ensure ownerId is set for project visibility
+  if (!newProject.ownerId) {
+    console.error('❌ CRITICAL: No ownerId set - project will not be visible to creator!')
+    throw new Error('User context required for project creation - ownerId must be set')
+  }
+  
+  console.log(`✅ Creating project with ownerId: ${newProject.ownerId}`)
+  console.log(`✅ Creating project with createdBy: ${newProject.createdBy}`)
+  
+  // Add to database
+  if (!db.data.projects) {
+    db.data.projects = []
+  }
+  
   db.data.projects.push(newProject)
   db.write()
+  
+  console.log(`✅ Project created successfully with ID: ${newProject.id}`)
   
   return newProject
 }
@@ -472,9 +492,10 @@ export function updateProject(id, updates) {
   
   const projectIndex = db.data.projects?.findIndex(p => p.id === id)
   if (projectIndex === -1) {
-    return null
+    throw new Error('Project not found')
   }
   
+  // Update project with new data
   db.data.projects[projectIndex] = {
     ...db.data.projects[projectIndex],
     ...updates,
@@ -491,14 +512,17 @@ export function deleteProject(id) {
   
   const projectIndex = db.data.projects?.findIndex(p => p.id === id)
   if (projectIndex === -1) {
-    return false
+    throw new Error('Project not found')
   }
   
+  const deletedProject = db.data.projects[projectIndex]
   db.data.projects.splice(projectIndex, 1)
   db.write()
-  return true
+  
+  return deletedProject
 }
 
+// User management functions
 export function getAllUsers() {
   db.read()
   return db.data.users || []
@@ -508,4 +532,59 @@ export function getUserById(id) {
   db.read()
   return db.data.users?.find(u => u.id === parseInt(id)) || null
 }
+
+export function createUser(userData) {
+  db.read()
+  
+  const newUser = {
+    id: Math.max(...(db.data.users?.map(u => u.id) || [0])) + 1,
+    ...userData,
+    createdAt: new Date().toISOString()
+  }
+  
+  if (!db.data.users) {
+    db.data.users = []
+  }
+  
+  db.data.users.push(newUser)
+  db.write()
+  
+  return newUser
+}
+
+export function updateUser(id, updates) {
+  db.read()
+  
+  const userIndex = db.data.users?.findIndex(u => u.id === parseInt(id))
+  if (userIndex === -1) {
+    throw new Error('User not found')
+  }
+  
+  db.data.users[userIndex] = {
+    ...db.data.users[userIndex],
+    ...updates,
+    updatedAt: new Date().toISOString()
+  }
+  
+  db.write()
+  return db.data.users[userIndex]
+}
+
+export function deleteUser(id) {
+  db.read()
+  
+  const userIndex = db.data.users?.findIndex(u => u.id === parseInt(id))
+  if (userIndex === -1) {
+    throw new Error('User not found')
+  }
+  
+  const deletedUser = db.data.users[userIndex]
+  db.data.users.splice(userIndex, 1)
+  db.write()
+  
+  return deletedUser
+}
+
+// Initialize database on module load
+initializeDatabase()
 

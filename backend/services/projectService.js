@@ -1,6 +1,6 @@
 // Enhanced Project service layer for comprehensive PFMT Excel processing
 import * as db from './database.js'
-import * as XLSX from 'xlsx'
+import XLSX from 'xlsx'
 import fs from 'fs/promises'
 
 export class ProjectService {
@@ -225,20 +225,40 @@ export class ProjectService {
     return cell.v
   }
   
-  // Helper function to convert string to number safely
+  // Helper function to convert string to number safely - ENHANCED VERSION
   static toNumber(value, defaultValue = 0) {
-    if (value === null || value === undefined || value === '') return defaultValue
-    if (typeof value === 'number') return value
+    if (value === null || value === undefined || value === '') {
+      return defaultValue
+    }
     
-    const numValue = parseFloat(value)
-    return isNaN(numValue) ? defaultValue : numValue
+    if (typeof value === 'number') {
+      // Handle floating point precision issues
+      return Math.round(value * 100) / 100
+    }
+    
+    if (typeof value === 'string') {
+      // Remove any currency symbols, commas, etc.
+      const cleanValue = value.replace(/[$,\s]/g, '')
+      const numValue = parseFloat(cleanValue)
+      
+      if (isNaN(numValue)) {
+        console.log(`⚠️  Could not convert "${value}" to number, using default: ${defaultValue}`)
+        return defaultValue
+      }
+      
+      // Handle floating point precision issues
+      return Math.round(numValue * 100) / 100
+    }
+    
+    console.log(`⚠️  Unexpected value type for number conversion: ${typeof value}, using default: ${defaultValue}`)
+    return defaultValue
   }
   
-  // Process SP Fields sheet
+  // Process SP Fields sheet - ENHANCED VERSION
   static processSPFields(worksheet) {
     const spData = {}
     
-    console.log('Processing SP Fields sheet with correct field mappings...')
+    console.log('=== Processing SP Fields Sheet (ENHANCED VERSION) ===')
     
     // Read key-value pairs from SP Fields sheet
     // Based on analysis: Column A = Field, Column B = Value
@@ -248,37 +268,59 @@ export class ProjectService {
       const fieldCell = worksheet[XLSX.utils.encode_cell({r: row, c: 0})]
       const valueCell = worksheet[XLSX.utils.encode_cell({r: row, c: 1})]
       
-      if (fieldCell && valueCell) {
-        const field = fieldCell.v
+      if (fieldCell && valueCell && fieldCell.v && valueCell.v !== undefined) {
+        const field = fieldCell.v.toString().trim()
         const value = valueCell.v
         
-        if (field && value !== undefined) {
-          spData[field] = value
-          console.log(`  SP Field found: ${field} = ${value}`)
-        }
+        // ENHANCED: Better logging and validation
+        console.log(`  SP Field: ${field} = ${value} (type: ${typeof value})`)
+        
+        // Store the raw value for processing
+        spData[field] = value
       }
     }
     
-    // Map to standardized field names with correct mappings from analysis
+    // ENHANCED: Map to standardized field names with improved number handling
     const result = {
       approvedTPC: this.toNumber(spData.SPOApprovedTPC) || 0,
       totalBudget: this.toNumber(spData.SPOBudgetTotal) || 0,
       currentYearCashflow: this.toNumber(spData.SPOCashflowCurrentYearTotal) || 0,
       futureYearCashflow: this.toNumber(spData.SPOCashflowFutureYearTotal) || 0,
       taf: this.toNumber(spData.SPOTotalApprovedFunding || spData.TAF || spData.SPOApprovedTPC) || 0,
-      eac: this.toNumber(spData.SPOEstimateAtCompletion || spData.EAC) || 0,
-      amountSpent: this.toNumber(spData.SPOAmountSpentTotal) || 0,
-      commitment: this.toNumber(spData.SPOCommitmentTotal) || 0,
-      variance: this.toNumber(spData.SPOVarianceTotal) || 0
+      eac: this.toNumber(spData.SPOEAC || spData.EAC) || 0,
+      amountSpent: this.toNumber(spData.SPOTotalExpenditurestoDate) || 0,
+      currentYearTarget: this.toNumber(spData.SPOCurrentYearTargetTotal) || 0,
+      currentYearProposedTarget: this.toNumber(spData.SPOCurrentYearProposedTargetTotal) || 0,
+      previousYearsApprovedTargets: this.toNumber(spData.SPOPreviousYearsApprovedTargets) || 0,
+      futureYearsApprovedTargets: this.toNumber(spData.SPOFutureYearsApprovedTargets) || 0,
+      percentCompleteTAF: this.toNumber(spData.SPOPercentCompleteTAFBudget) || 0,
+      percentCompleteEAC: this.toNumber(spData.SPOPercentCompleteEACBudget) || 0,
+      totalCashflow: this.toNumber(spData.SPOTotalCashflow) || 0,
+      currentFiscalYearActuals: this.toNumber(spData.SPOCurrentFiscalYearActuals) || 0,
+      cashflowPreviousYears: this.toNumber(spData.SPOCashflowPreviousYearsTotal) || 0,
+      currentYearBudgetTarget: this.toNumber(spData.SPOCurrentYearBudgetTarget) || 0
     }
     
     // Calculate derived values if not present
-    result.totalCashflow = result.currentYearCashflow + result.futureYearCashflow
-    if (!result.variance && result.approvedTPC && result.eac) {
+    if (!result.totalCashflow && (result.currentYearCashflow || result.futureYearCashflow)) {
+      result.totalCashflow = result.currentYearCashflow + result.futureYearCashflow
+    }
+    
+    // Calculate variance if we have the necessary data
+    if (result.approvedTPC && result.eac) {
       result.variance = result.approvedTPC - result.eac
     }
     
-    console.log('Final SP Fields mapping:', result)
+    // CRITICAL: Ensure no 'name' field is included from SP Fields
+    // This prevents financial data from overriding the project name
+    if (result.name) {
+      console.log('⚠️  Removing incorrect name field from SP Fields data')
+      delete result.name
+    }
+    
+    console.log('=== Final SP Fields Mapping ===')
+    console.log(JSON.stringify(result, null, 2))
+    
     return result
   }
   
@@ -466,45 +508,100 @@ export class ProjectService {
     }
   }
   
-  // Process Validations sheet for project setup data
+  // Process Validations sheet for project setup data - FIXED VERSION
   static processValidations(worksheet) {
     const validationData = {}
     
-    // Extract project title from C6 based on analysis results
-    const projectTitle = this.getCellValue(worksheet, 'C6') || 
-                        this.getCellValue(worksheet, 'A5') || 
-                        this.getCellValue(worksheet, 'B5') || ''
+    console.log('=== Processing Validations Sheet (FIXED VERSION) ===')
+    
+    // FIXED: Correct cell reference for project name
+    // Excel Row 6, Col 3 = XLSX row 5, col 2 (0-based indexing)
+    // Using direct cell address 'C6' which XLSX should handle correctly
+    const projectNameCell = worksheet['C6']
     
     console.log('Checking project name extraction:')
-    console.log('  C6:', this.getCellValue(worksheet, 'C6'))
-    console.log('  A5:', this.getCellValue(worksheet, 'A5'))
-    console.log('  B5:', this.getCellValue(worksheet, 'B5'))
+    console.log('  C6 cell object:', projectNameCell)
+    console.log('  C6 value:', projectNameCell ? projectNameCell.v : 'undefined')
     
-    if (projectTitle && projectTitle.trim()) {
-      validationData.name = projectTitle.trim()
-      console.log(`Project name extracted: "${validationData.name}"`)
-    } else {
-      // Fallback: scan for project name patterns
-      console.log('No project name found in expected cells, scanning...')
-      const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:F20')
+    if (projectNameCell && projectNameCell.v) {
+      const projectName = projectNameCell.v.toString().trim()
+      if (projectName && projectName.length > 0) {
+        validationData.name = projectName
+        console.log(`✅ Project name extracted from C6: "${validationData.name}"`)
+      }
+    }
+    
+    // If C6 doesn't work, try alternative approaches
+    if (!validationData.name) {
+      console.log('⚠️  C6 failed, trying alternative cell references...')
+      
+      // Try using encode_cell for exact positioning
+      const altCell1 = worksheet[XLSX.utils.encode_cell({r: 5, c: 2})] // Row 6, Col 3 (0-based)
+      const altCell2 = worksheet[XLSX.utils.encode_cell({r: 4, c: 2})] // Row 5, Col 3 (0-based)
+      
+      console.log('  Alternative cell 1 (r:5,c:2):', altCell1 ? altCell1.v : 'undefined')
+      console.log('  Alternative cell 2 (r:4,c:2):', altCell2 ? altCell2.v : 'undefined')
+      
+      if (altCell1 && altCell1.v) {
+        validationData.name = altCell1.v.toString().trim()
+        console.log(`✅ Project name extracted from alternative cell 1: "${validationData.name}"`)
+      } else if (altCell2 && altCell2.v) {
+        validationData.name = altCell2.v.toString().trim()
+        console.log(`✅ Project name extracted from alternative cell 2: "${validationData.name}"`)
+      }
+    }
+    
+    // IMPROVED: Enhanced fallback scanning with numeric exclusion
+    if (!validationData.name) {
+      console.log('⚠️  Direct cell access failed, performing enhanced scanning...')
+      const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:P20')
+      
       for (let row = range.s.r; row <= Math.min(range.e.r, 20); row++) {
-        for (let col = range.s.c; col <= Math.min(range.e.c, 5); col++) {
+        for (let col = range.s.c; col <= Math.min(range.e.c, 15); col++) {
           const cellAddr = XLSX.utils.encode_cell({r: row, c: col})
-          const cellValue = this.getCellValue(worksheet, cellAddr)
+          const cell = worksheet[cellAddr]
           
-          if (cellValue && typeof cellValue === 'string') {
-            // Look for patterns that might indicate a project name
-            if (cellValue.toLowerCase().includes('justice') || 
-                cellValue.toLowerCase().includes('center') ||
-                cellValue.toLowerCase().includes('centre') ||
-                (cellValue.length > 5 && cellValue.length < 100 && 
-                 !cellValue.toLowerCase().includes('field') &&
-                 !cellValue.toLowerCase().includes('value') &&
-                 !cellValue.toLowerCase().includes('validation') &&
-                 !cellValue.toLowerCase().includes('category'))) {
-              validationData.name = cellValue.trim()
-              console.log(`Found potential project name at ${cellAddr}: ${cellValue}`)
-              break
+          if (cell && cell.v) {
+            const cellValue = cell.v.toString().trim()
+            
+            // FIXED: Exclude numeric values and improve pattern matching
+            if (cellValue && 
+                typeof cellValue === 'string' && 
+                cellValue.length > 2 && 
+                cellValue.length < 100) {
+              
+              // Skip if it's a pure number (including decimals)
+              if (!isNaN(parseFloat(cellValue)) && isFinite(cellValue)) {
+                continue
+              }
+              
+              // Skip common Excel headers and labels
+              const skipPatterns = [
+                'field', 'value', 'validation', 'category', 'overview',
+                'information', 'locked', 'modifiable', 'lists', 'auth',
+                'fiscal', 'year', 'phase', 'subproject', 'funding', 'source',
+                'description', 'capital', 'plan', 'line', 'approved', 'historical',
+                'project id', 'ref', 'primary'
+              ]
+              
+              const lowerValue = cellValue.toLowerCase()
+              const shouldSkip = skipPatterns.some(pattern => lowerValue.includes(pattern))
+              
+              if (!shouldSkip) {
+                // Look for project name patterns
+                if (lowerValue.includes('justice') || 
+                    lowerValue.includes('center') ||
+                    lowerValue.includes('centre') ||
+                    (cellValue.includes(' ') && // Multi-word names are more likely to be project names
+                     !lowerValue.includes(':') && // Skip label:value pairs
+                     !lowerValue.includes('=') && // Skip formula results
+                     cellValue.match(/^[a-zA-Z\s\-\.]+$/))) { // Only letters, spaces, hyphens, dots
+                  
+                  validationData.name = cellValue
+                  console.log(`✅ Found project name via scanning at ${cellAddr}: "${cellValue}"`)
+                  break
+                }
+              }
             }
           }
         }
@@ -512,13 +609,33 @@ export class ProjectService {
       }
     }
     
-    // Extract other validation fields
-    validationData.projectManager = this.getCellValue(worksheet, 'B10') || ''
-    validationData.category = this.getCellValue(worksheet, 'B8') || ''
-    validationData.phase = this.getCellValue(worksheet, 'B9') || ''
-    validationData.geographicRegion = this.getCellValue(worksheet, 'B11') || ''
+    // Extract other validation fields with improved cell references
+    try {
+      // These may need adjustment based on actual Excel layout
+      validationData.projectManager = this.getCellValue(worksheet, 'B10') || ''
+      validationData.category = this.getCellValue(worksheet, 'B8') || ''
+      validationData.phase = this.getCellValue(worksheet, 'B9') || ''
+      validationData.geographicRegion = this.getCellValue(worksheet, 'B11') || ''
+      
+      // Try to extract Historical Project ID from the expected location
+      const historicalIdCell = worksheet['P10'] || worksheet['P6'] // Column P, various rows
+      if (historicalIdCell && historicalIdCell.v) {
+        validationData.historicalProjectId = historicalIdCell.v.toString().trim()
+      }
+      
+    } catch (error) {
+      console.log('⚠️  Error extracting additional validation fields:', error.message)
+    }
     
-    console.log('Final extracted validation data:', validationData)
+    console.log('=== Final Validation Data ===')
+    console.log(JSON.stringify(validationData, null, 2))
+    
+    // CRITICAL: Ensure we have a project name
+    if (!validationData.name || validationData.name.trim() === '') {
+      console.error('❌ CRITICAL: No project name found in Validations sheet!')
+      throw new Error('Unable to extract project name from Excel file. Please ensure the project name is in cell C6 of the Validations sheet.')
+    }
+    
     return validationData
   }
   
@@ -610,7 +727,7 @@ export class ProjectService {
         extractedData.sheetsProcessed.push('Change Tracking')
       }
       
-      // Process Cost Tracking sheet
+      // Process Cost Tracking sheet for vendor data
       if (workbook.SheetNames.includes('Cost Tracking')) {
         console.log('Processing Cost Tracking sheet...')
         const vendorData = this.processCostTracking(workbook.Sheets['Cost Tracking'])
@@ -626,70 +743,24 @@ export class ProjectService {
         extractedData.sheetsProcessed.push('Prime Cont. Summary')
       }
       
-      // Validations sheet already processed first for project name priority
-      
-      // Calculate derived values
-      const tafEacVariance = extractedData.eac - extractedData.taf
-      const cashflowVariance = extractedData.currentYearCashflow - extractedData.currentYearBudgetTarget
-      const budgetUtilization = extractedData.totalBudget > 0 ? 
-        (extractedData.amountSpent / extractedData.totalBudget) * 100 : 0
-      
-      // Prepare comprehensive update data
-      const updateData = {
-        // Core project data - PROTECT project name from financial data override
-        name: (extractedData.name && extractedData.name.includes && !extractedData.name.includes('SPO') && !extractedData.name.includes('1515172')) 
-              ? extractedData.name 
-              : project.name,
-        approvedTPC: extractedData.approvedTPC,
-        totalBudget: extractedData.totalBudget,
-        currentYearCashflow: extractedData.currentYearCashflow,
-        futureYearCashflow: extractedData.futureYearCashflow,
-        
-        // Contractor and delivery info
-        primeContractor: extractedData.primeContractor || project.primeContractor,
-        deliveryMethod: extractedData.deliveryMethod || project.deliveryMethod,
-        
-        // Array data
-        fundingLines: extractedData.fundingLines,
-        vendors: extractedData.vendors,
-        changeOrders: extractedData.changeOrders,
-        
-        // PFMT metadata
+      // Update project with extracted data
+      const updatedProject = this.updateProject(projectId, {
+        ...extractedData,
         lastPfmtUpdate: new Date().toISOString(),
         pfmtFileName: fileName,
-        pfmtExtractedAt: new Date().toISOString(),
-        reportStatus: 'Current',
-        
-        // Store complete PFMT data for future reference
-        pfmtData: extractedData,
-        
-        // Calculated values
-        tafEacVariance,
-        cashflowVariance,
-        budgetUtilization
-      }
-      
-      // Update project with extracted data
-      const updatedProject = db.updateProject(projectId, updateData)
+        pfmtExtractedAt: new Date().toISOString()
+      })
       
       // Clean up uploaded file
       try {
         await fs.unlink(filePath)
       } catch (cleanupError) {
-        console.warn('Failed to clean up uploaded file:', cleanupError)
+        console.log('Failed to clean up uploaded file after processing:', cleanupError.message)
       }
       
       return {
         project: updatedProject,
-        extractedData: {
-          ...extractedData,
-          tafEacVariance,
-          cashflowVariance,
-          budgetUtilization,
-          fileName,
-          extractedAt: updateData.pfmtExtractedAt
-        },
-        pfmtData: extractedData
+        extractedData: extractedData
       }
       
     } catch (error) {
@@ -697,7 +768,7 @@ export class ProjectService {
       try {
         await fs.unlink(filePath)
       } catch (cleanupError) {
-        console.warn('Failed to clean up uploaded file after error:', cleanupError)
+        console.log('Failed to clean up uploaded file after error:', cleanupError.message)
       }
       
       throw error

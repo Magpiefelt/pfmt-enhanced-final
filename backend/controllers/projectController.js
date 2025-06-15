@@ -149,6 +149,10 @@ export class ProjectController {
     try {
       const projectData = req.body
       
+      console.log('=== Controller createProject (ENHANCED) ===')
+      console.log('Request body:', JSON.stringify(projectData, null, 2))
+      console.log('Request user:', JSON.stringify(req.user, null, 2))
+      
       // Validate required fields - only name is required now
       if (!projectData.name) {
         return res.status(400).json({
@@ -158,25 +162,39 @@ export class ProjectController {
         })
       }
       
-      // Ensure proper ownership assignment
+      // ENHANCED: Ensure proper ownership assignment
       if (req.user) {
         // Set the creator as the owner if not specified
         if (!projectData.ownerId) {
           projectData.ownerId = req.user.id
+          console.log(`✅ Set ownerId to: ${req.user.id}`)
         }
         
         // Set project manager if not specified and user is a PM
         if (!projectData.projectManager && 
             (req.user.role?.toLowerCase() === 'project manager' || req.user.role?.toLowerCase() === 'pm')) {
           projectData.projectManager = req.user.name
+          console.log(`✅ Set projectManager to: ${req.user.name}`)
         }
         
         // Add creation metadata
         projectData.createdBy = req.user.name
         projectData.createdByUserId = req.user.id
+        console.log(`✅ Set createdBy to: ${req.user.name}`)
+        console.log(`✅ Set createdByUserId to: ${req.user.id}`)
+      } else {
+        console.error('❌ CRITICAL: No user context in request!')
+        return res.status(401).json({
+          success: false,
+          error: 'Authentication required',
+          message: 'User context required for project creation'
+        })
       }
       
       const newProject = ProjectService.createProject(projectData, req.user)
+      
+      console.log(`✅ Project created successfully: ${newProject.id}`)
+      console.log(`✅ Project owner: ${newProject.ownerId}`)
       
       res.status(201).json({
         success: true,
@@ -505,7 +523,6 @@ export class ProjectController {
         success: true,
         data: result.project,
         extractedData: result.extractedData,
-        pfmtData: result.pfmtData,
         message: 'PFMT Excel file processed successfully'
       })
     } catch (error) {
@@ -518,10 +535,18 @@ export class ProjectController {
         })
       }
       
-      if (error.message.includes('No worksheets found')) {
+      if (error.message.includes('Unable to extract project name')) {
         return res.status(400).json({
           success: false,
           error: 'Invalid PFMT Excel file',
+          message: 'Could not extract project name from Excel file. Please ensure the project name is in cell C6 of the Validations sheet.'
+        })
+      }
+      
+      if (error.message.includes('No worksheets found')) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid Excel file',
           message: 'The uploaded file does not contain any worksheets'
         })
       }
