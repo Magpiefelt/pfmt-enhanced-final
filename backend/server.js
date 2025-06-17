@@ -1,6 +1,9 @@
 // Server startup file
 import app from './app.js'
 import { initializeDatabase } from './services/database.js'
+import enhancedProjectRoutes from './routes/enhancedProjects.js'
+
+app.use('/api/projects', enhancedProjectRoutes)
 
 const PORT = process.env.PORT || 3001
 

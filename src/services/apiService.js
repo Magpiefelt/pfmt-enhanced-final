@@ -1,13 +1,35 @@
-// API service for communicating with the backend
+// Enhanced API service with user context support
 const API_BASE_URL = 'http://localhost:3001/api'
 
 class ApiService {
-  // Helper method for making HTTP requests
+  // Helper method for making HTTP requests with user context
   static async request(endpoint, options = {}) {
     const url = `${API_BASE_URL}${endpoint}`
+    
+    // Get current user from auth store
+    const getCurrentUser = () => {
+      try {
+        // Import the store dynamically to avoid circular dependencies
+        const { useAuthStore } = require('../stores/index.js')
+        const authStore = useAuthStore.getState()
+        return authStore.currentUser
+      } catch (error) {
+        console.warn('Could not get current user from store:', error)
+        return null
+      }
+    }
+    
+    const currentUser = getCurrentUser()
+    
     const config = {
       headers: {
         'Content-Type': 'application/json',
+        // Add user context to headers
+        ...(currentUser && {
+          'X-User-Id': currentUser.id.toString(),
+          'X-User-Role': currentUser.role,
+          'X-User-Name': currentUser.name
+        }),
         ...options.headers
       },
       ...options
@@ -28,20 +50,43 @@ class ApiService {
     }
   }
 
-  // Helper method for file uploads
+  // Helper method for file uploads with user context
   static async uploadFile(endpoint, file, additionalData = {}) {
     const url = `${API_BASE_URL}${endpoint}`
     const formData = new FormData()
     formData.append('file', file)
+    
+    // Get current user from auth store
+    const getCurrentUser = () => {
+      try {
+        const { useAuthStore } = require('../stores/index.js')
+        const authStore = useAuthStore.getState()
+        return authStore.currentUser
+      } catch (error) {
+        console.warn('Could not get current user from store:', error)
+        return null
+      }
+    }
+    
+    const currentUser = getCurrentUser()
     
     // Add any additional form data
     Object.keys(additionalData).forEach(key => {
       formData.append(key, additionalData[key])
     })
 
+    const headers = {}
+    // Add user context to headers
+    if (currentUser) {
+      headers['X-User-Id'] = currentUser.id.toString()
+      headers['X-User-Role'] = currentUser.role
+      headers['X-User-Name'] = currentUser.name
+    }
+
     try {
       const response = await fetch(url, {
         method: 'POST',
+        headers,
         body: formData
       })
       
@@ -88,7 +133,7 @@ export class ProjectAPI {
     return await ApiService.request(`/projects/${id}`)
   }
 
-  // Create new project
+  // Create new project with user context
   static async createProject(projectData) {
     return await ApiService.request('/projects', {
       method: 'POST',
