@@ -1,4 +1,4 @@
-// Enhanced mock data service with per-project storage and archiving
+// Enhanced mock data service with improved data model
 import { generateId } from '../utils/index.js'
 
 // Project template for new projects
@@ -100,15 +100,54 @@ export const projectTemplate = {
   monthlyArchive: []
 }
 
-// Enhanced mock data with per-project storage
+// Enhanced mock data with improved structure
 export const mockProjects = [
   {
-    id: "88:36:D3",
+    id: "p1001",
     name: "Calgary Elementary School Renovation",
+    ownerId: "u1",
+    userIds: ["u1", "u2"],
+    vendorIds: ["v1", "v2"],
+    status: "Active",
+    files: ["file_001", "file_002"],
+    fundingTotal: 2450000,
+    spentTotal: 1680000,
+    fundingSources: [
+      {
+        source: "P-002360",
+        description: "General Facilities Infrastructure",
+        capitalPlanLine: "Calgary Elementary School Renovation",
+        approvedValue: 2450000,
+        currentYearBudget: 1150000,
+        currentYearApproved: 1200000,
+        projectId: "B0536D-0010",
+        wbs: "P-002360"
+      }
+    ],
+    costs: [
+      {
+        id: "exp1",
+        vendorId: "v1",
+        description: "Initial contract payment",
+        amount: 1200000,
+        date: "2024-05-01"
+      },
+      {
+        id: "exp2",
+        vendorId: "v1",
+        description: "Material supply payment",
+        amount: 480000,
+        date: "2024-06-15"
+      }
+    ],
+    active: true,
+    createdAt: "2024-03-01T08:00:00.000Z",
+    updatedAt: "2024-06-12T10:30:00.000Z",
+    
+    // Legacy fields for backward compatibility
     contractor: "ABC Construction Ltd.",
     startDate: "2024-03-15",
     submissions: 12,
-    status: "Active",
     reportStatus: "Update Required",
     description: "Complete renovation of elementary school facilities including classroom upgrades and safety improvements",
     phase: "Construction",
@@ -141,7 +180,6 @@ export const mockProjects = [
     approvedDate: null,
     directorApproved: false,
     seniorPmReviewed: false,
-    // Per-project data
     milestones: [
       {
         id: 1,
@@ -248,12 +286,51 @@ export const mockProjects = [
     monthlyArchive: []
   },
   {
-    id: "77:24:B1",
+    id: "p1002",
     name: "Edmonton Hospital Wing Addition",
+    ownerId: "u2",
+    userIds: ["u2", "u3"],
+    vendorIds: ["v3"],
+    status: "Active",
+    files: ["file_003"],
+    fundingTotal: 5200000,
+    spentTotal: 1560000,
+    fundingSources: [
+      {
+        source: "P-002361",
+        description: "Healthcare Infrastructure",
+        capitalPlanLine: "Edmonton Hospital Wing Addition",
+        approvedValue: 5200000,
+        currentYearBudget: 2200000,
+        currentYearApproved: 2100000,
+        projectId: "B0068AE-0030",
+        wbs: "P-002361"
+      }
+    ],
+    costs: [
+      {
+        id: "exp3",
+        vendorId: "v3",
+        description: "Design phase payment",
+        amount: 780000,
+        date: "2024-04-15"
+      },
+      {
+        id: "exp4",
+        vendorId: "v3",
+        description: "Equipment procurement",
+        amount: 780000,
+        date: "2024-05-15"
+      }
+    ],
+    active: true,
+    createdAt: "2024-01-01T08:00:00.000Z",
+    updatedAt: "2024-05-21T09:15:00.000Z",
+    
+    // Legacy fields for backward compatibility
     contractor: "MediConstruct Inc.",
     startDate: "2024-01-10",
     submissions: 8,
-    status: "Active",
     reportStatus: "Current",
     description: "New wing addition to Edmonton General Hospital with specialized medical equipment installation",
     phase: "Design Development",
@@ -288,46 +365,125 @@ export const mockProjects = [
     seniorPmReviewed: true,
     pfmtFileName: "Edmonton-Hospital-PFMT-May2024.xlsx",
     pfmtExtractedAt: "2024-05-15T10:30:00Z"
+  }
+]
+
+// Enhanced users with new structure
+export const mockUsers = [
+  {
+    id: "u1",
+    name: "Sarah Johnson",
+    email: "sarah.johnson@company.com",
+    role: "Project Manager",
+    department: "IT Projects",
+    title: "Project Manager",
+    externalIds: {
+      hrSystemId: "EMP00123"
+    }
   },
   {
-    id: "99:48:C7",
-    name: "Red Deer Community Center",
-    contractor: "Community Builders Ltd.",
-    startDate: "2024-02-20",
-    submissions: 15,
-    status: "Active",
-    reportStatus: "Review Required",
-    description: "Multi-purpose community center with gymnasium, meeting rooms, and recreational facilities",
-    phase: "Construction",
-    region: "Red Deer",
-    location: "789 Community Drive, Red Deer, AB T4N 1A5",
-    deliveryMethod: "Design-Build",
-    projectManager: "Sarah Johnson",
-    seniorProjectManager: "Michael Brown",
-    director: "Lisa Wilson",
-    additionalTeam: ["Mark Thompson - Structural Engineer", "Lisa Chen - Interior Designer"],
-    totalBudget: 3800000,
-    amountSpent: 2280000,
-    taf: 3800000,
-    eac: 3950000,
-    currentYearCashflow: 1900000,
-    targetCashflow: 1800000,
-    lastPfmtUpdate: null,
-    scheduleStatus: "Yellow",
-    budgetStatus: "Red",
-    scheduleReasonCode: "Weather Delays",
-    budgetReasonCode: "Change Orders",
-    monthlyComments: "Weather delays in March affected schedule. Additional change orders for accessibility improvements",
-    previousHighlights: "Structural work completed",
-    nextSteps: "Interior finishing and equipment installation",
-    budgetVarianceExplanation: "Client requested additional accessibility features adding $150K to budget",
-    cashflowVarianceExplanation: "Accelerated payments to maintain schedule",
-    submittedBy: null,
-    submittedDate: null,
-    approvedBy: null,
-    approvedDate: null,
-    directorApproved: false,
-    seniorPmReviewed: false
+    id: "u2",
+    name: "Michael Brown",
+    email: "michael.brown@company.com",
+    role: "Senior Project Manager",
+    department: "Infrastructure",
+    title: "Senior Project Manager",
+    externalIds: {
+      hrSystemId: "EMP00124"
+    }
+  },
+  {
+    id: "u3",
+    name: "Lisa Wilson",
+    email: "lisa.wilson@company.com",
+    role: "Director",
+    department: "Project Management Office",
+    title: "Director of Projects",
+    externalIds: {
+      hrSystemId: "EMP00125"
+    }
+  },
+  {
+    id: "u4",
+    name: "David Chen",
+    email: "david.chen@company.com",
+    role: "Director",
+    department: "Healthcare Projects",
+    title: "Director of Healthcare Infrastructure",
+    externalIds: {
+      hrSystemId: "EMP00126"
+    }
+  }
+]
+
+// New vendors entity
+export const mockVendors = [
+  {
+    id: "v1",
+    name: "ABC Construction Ltd.",
+    contact: {
+      name: "John Smith",
+      email: "john@abcconstruction.com",
+      phone: "(403) 555-0123"
+    },
+    address: "100 Construction Ave, Calgary, AB T2P 1A1",
+    crmId: "ABC-001"
+  },
+  {
+    id: "v2",
+    name: "Steel Supply Co.",
+    contact: {
+      name: "Jane Doe",
+      email: "jane@steelsupply.com",
+      phone: "(403) 555-0456"
+    },
+    address: "200 Industrial Blvd, Calgary, AB T2P 2B2",
+    crmId: "STEEL-001"
+  },
+  {
+    id: "v3",
+    name: "MediConstruct Inc.",
+    contact: {
+      name: "Dr. Robert Wilson",
+      email: "robert@mediconstruct.com",
+      phone: "(780) 555-0789"
+    },
+    address: "300 Healthcare Way, Edmonton, AB T5K 3C3",
+    crmId: "MEDI-001"
+  }
+]
+
+// New files entity
+export const mockFiles = [
+  {
+    id: "file_001",
+    projectId: "p1001",
+    name: "Calgary_School_Plans.pdf",
+    type: "application/pdf",
+    url: "https://storage.example.com/files/calgary_school_plans.pdf",
+    uploadedBy: "u1",
+    uploadedAt: "2024-03-15T10:00:00Z",
+    externalStorage: "AWS_S3"
+  },
+  {
+    id: "file_002",
+    projectId: "p1001",
+    name: "Material_Specifications.xlsx",
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    url: "https://storage.example.com/files/material_specs.xlsx",
+    uploadedBy: "u1",
+    uploadedAt: "2024-04-01T14:30:00Z",
+    externalStorage: "AWS_S3"
+  },
+  {
+    id: "file_003",
+    projectId: "p1002",
+    name: "Edmonton-Hospital-PFMT-May2024.xlsx",
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    url: "https://storage.example.com/files/edmonton_hospital_pfmt.xlsx",
+    uploadedBy: "u2",
+    uploadedAt: "2024-05-15T10:30:00Z",
+    externalStorage: "AWS_S3"
   }
 ]
 
@@ -431,9 +587,8 @@ export const mockMilestones = [
   }
 ]
 
-// API simulation functions
+// Enhanced API simulation functions with new data model support
 export const getProjects = async (filter = 'all') => {
-  // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 500))
   
   if (filter === 'all') {
@@ -463,12 +618,225 @@ export const updateProject = async (id, updates) => {
   await new Promise(resolve => setTimeout(resolve, 400))
   const projectIndex = mockProjects.findIndex(project => project.id === id)
   if (projectIndex !== -1) {
-    mockProjects[projectIndex] = { ...mockProjects[projectIndex], ...updates }
+    mockProjects[projectIndex] = { 
+      ...mockProjects[projectIndex], 
+      ...updates,
+      updatedAt: new Date().toISOString()
+    }
     return mockProjects[projectIndex]
   }
   throw new Error('Project not found')
 }
 
+// Enhanced create new project function with improved data model
+export const createNewProject = async (projectData) => {
+  await new Promise(resolve => setTimeout(resolve, 600))
+  
+  const newProjectId = `p${Date.now()}`
+  const currentDate = new Date().toISOString()
+  
+  // Find the creating user
+  const creatingUser = mockUsers.find(user => user.name === projectData.createdBy)
+  const ownerId = creatingUser ? creatingUser.id : "u1"
+  
+  const newProject = {
+    // New data model fields
+    id: newProjectId,
+    name: projectData.name,
+    ownerId: ownerId,
+    userIds: [ownerId], // Owner is automatically included
+    vendorIds: [],
+    status: projectData.status || "Active",
+    files: [],
+    fundingTotal: 0,
+    spentTotal: 0,
+    fundingSources: [],
+    costs: [],
+    active: true,
+    createdAt: currentDate,
+    updatedAt: currentDate,
+    
+    // Legacy fields for backward compatibility
+    contractor: "",
+    startDate: currentDate.split('T')[0],
+    submissions: 0,
+    reportStatus: "Update Required",
+    description: projectData.description,
+    phase: projectData.phase || "Initiation",
+    region: "",
+    location: "",
+    deliveryMethod: "",
+    projectManager: projectData.createdBy,
+    seniorProjectManager: "",
+    director: "",
+    additionalTeam: [],
+    totalBudget: 0,
+    amountSpent: 0,
+    taf: 0,
+    eac: 0,
+    currentYearCashflow: 0,
+    targetCashflow: 0,
+    lastPfmtUpdate: null,
+    scheduleStatus: "Green",
+    budgetStatus: "Green",
+    scheduleReasonCode: "",
+    budgetReasonCode: "",
+    monthlyComments: "",
+    previousHighlights: "",
+    nextSteps: "",
+    budgetVarianceExplanation: "",
+    cashflowVarianceExplanation: "",
+    submittedBy: null,
+    submittedDate: null,
+    approvedBy: null,
+    approvedDate: null,
+    directorApproved: false,
+    seniorPmReviewed: false,
+    
+    // Additional project data
+    preliminaryResourceRequirements: projectData.preliminaryResourceRequirements || "",
+    programAssignment: projectData.programAssignment || "",
+    clientMinistry: projectData.clientMinistry || "",
+    projectType: projectData.projectType || "",
+    
+    // Initialize with template data
+    ...projectTemplate
+  }
+  
+  mockProjects.push(newProject)
+  return newProject
+}
+
+// Enhanced PFMT data import function
+export const importPFMTData = async (projectId, pfmtData) => {
+  await new Promise(resolve => setTimeout(resolve, 800))
+  
+  const projectIndex = mockProjects.findIndex(project => project.id === projectId)
+  if (projectIndex === -1) {
+    throw new Error('Project not found')
+  }
+  
+  const currentDate = new Date().toISOString()
+  
+  // Create file record for PFMT file
+  const fileId = `file_${Date.now()}`
+  const newFile = {
+    id: fileId,
+    projectId: projectId,
+    name: pfmtData.fileName,
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    url: `https://storage.example.com/files/${pfmtData.fileName}`,
+    uploadedBy: mockProjects[projectIndex].ownerId,
+    uploadedAt: currentDate,
+    externalStorage: "AWS_S3"
+  }
+  
+  mockFiles.push(newFile)
+  
+  // Update project with PFMT data
+  const updates = {
+    // New data model fields
+    fundingTotal: pfmtData.taf || 0,
+    spentTotal: pfmtData.currentYearCashflow || 0,
+    files: [...(mockProjects[projectIndex].files || []), fileId],
+    updatedAt: currentDate,
+    
+    // Legacy fields for backward compatibility
+    taf: pfmtData.taf || 0,
+    eac: pfmtData.eac || 0,
+    currentYearCashflow: pfmtData.currentYearCashflow || 0,
+    targetCashflow: pfmtData.currentYearTarget || 0,
+    lastPfmtUpdate: currentDate,
+    pfmtFileName: pfmtData.fileName,
+    pfmtExtractedAt: currentDate,
+    pfmtData: {
+      sheetsProcessed: pfmtData.availableSheets || [],
+      extractedAt: currentDate,
+      originalData: pfmtData
+    }
+  }
+  
+  // Update project name if extracted from PFMT
+  if (pfmtData['Project Name'] && pfmtData['Project Name'].trim()) {
+    updates.name = pfmtData['Project Name'].trim()
+  }
+  
+  mockProjects[projectIndex] = { ...mockProjects[projectIndex], ...updates }
+  return mockProjects[projectIndex]
+}
+
+// User management functions
+export const getUsers = async () => {
+  await new Promise(resolve => setTimeout(resolve, 300))
+  return mockUsers
+}
+
+export const getUser = async (id) => {
+  await new Promise(resolve => setTimeout(resolve, 200))
+  return mockUsers.find(user => user.id === id)
+}
+
+export const createUser = async (userData) => {
+  await new Promise(resolve => setTimeout(resolve, 400))
+  
+  const newUserId = `u${Date.now()}`
+  const newUser = {
+    id: newUserId,
+    name: userData.name,
+    email: userData.email,
+    role: userData.role,
+    department: userData.department || "",
+    title: userData.title || userData.role,
+    externalIds: userData.externalIds || {}
+  }
+  
+  mockUsers.push(newUser)
+  return newUser
+}
+
+// Vendor management functions
+export const getVendors = async () => {
+  await new Promise(resolve => setTimeout(resolve, 300))
+  return mockVendors
+}
+
+export const getVendor = async (id) => {
+  await new Promise(resolve => setTimeout(resolve, 200))
+  return mockVendors.find(vendor => vendor.id === id)
+}
+
+export const createVendor = async (vendorData) => {
+  await new Promise(resolve => setTimeout(resolve, 400))
+  
+  const newVendorId = `v${Date.now()}`
+  const newVendor = {
+    id: newVendorId,
+    name: vendorData.name,
+    contact: vendorData.contact || {},
+    address: vendorData.address || "",
+    crmId: vendorData.crmId || ""
+  }
+  
+  mockVendors.push(newVendor)
+  return newVendor
+}
+
+// File management functions
+export const getFiles = async (projectId = null) => {
+  await new Promise(resolve => setTimeout(resolve, 300))
+  
+  if (projectId) {
+    return mockFiles.filter(file => file.projectId === projectId)
+  }
+  return mockFiles
+}
+
+export const getFile = async (id) => {
+  await new Promise(resolve => setTimeout(resolve, 200))
+  return mockFiles.find(file => file.id === id)
+}
+
+// Existing functions maintained for backward compatibility
 export const getSubmissions = async (projectId) => {
   await new Promise(resolve => setTimeout(resolve, 300))
   return mockSubmissions
@@ -489,7 +857,6 @@ export const updateMilestone = async (milestoneId, updates) => {
   throw new Error('Milestone not found')
 }
 
-
 // Post-approval archiving and workflow reset functions
 export const archiveMonthlyData = async (projectId) => {
   await new Promise(resolve => setTimeout(resolve, 500))
@@ -502,11 +869,10 @@ export const archiveMonthlyData = async (projectId) => {
   const project = mockProjects[projectIndex]
   const currentDate = new Date().toISOString()
   
-  // Create archive entry for this month
   const archiveEntry = {
     id: generateId(),
     archivedDate: currentDate,
-    reportingPeriod: new Date().toISOString().slice(0, 7), // YYYY-MM format
+    reportingPeriod: new Date().toISOString().slice(0, 7),
     data: {
       scheduleStatus: project.scheduleStatus,
       budgetStatus: project.budgetStatus,
@@ -529,10 +895,8 @@ export const archiveMonthlyData = async (projectId) => {
     }
   }
 
-  // Add to monthly archive
   project.monthlyArchive.push(archiveEntry)
 
-  // Reset workflow status for next cycle
   const updates = {
     reportStatus: "Update Required",
     scheduleReasonCode: "",
@@ -547,60 +911,24 @@ export const archiveMonthlyData = async (projectId) => {
     approvedBy: null,
     approvedDate: null,
     directorApproved: false,
-    seniorPmReviewed: false
+    seniorPmReviewed: false,
+    updatedAt: currentDate
   }
 
-  // Apply updates
-  Object.assign(project, updates)
-  
-  return {
-    success: true,
-    archiveEntry,
-    message: `Monthly data archived successfully. Project status reset for next reporting cycle.`
-  }
+  mockProjects[projectIndex] = { ...project, ...updates }
+  return mockProjects[projectIndex]
 }
 
-// Create new project function for PM workflow
-export const createNewProject = async (projectData) => {
-  await new Promise(resolve => setTimeout(resolve, 800))
+export const resetProjectWorkflow = async (projectId) => {
+  await new Promise(resolve => setTimeout(resolve, 300))
   
-  const newProject = {
-    id: generateId(),
-    name: projectData.name,
-    description: projectData.description || "",
-    preliminaryResourceRequirements: projectData.preliminaryResourceRequirements || "",
-    programAssignment: projectData.programAssignment || "",
-    clientMinistry: projectData.clientMinistry || "",
-    projectType: projectData.projectType || "",
-    createdBy: projectData.createdBy || "",
-    createdDate: projectData.createdDate || new Date().toISOString(),
-    contractor: "",
-    startDate: null,
-    submissions: 0,
-    status: "Planning",
-    reportStatus: "Not Started",
-    phase: "Initiation",
-    region: "",
-    location: "",
-    deliveryMethod: "Traditional",
-    projectManager: projectData.projectManager || projectData.createdBy || "",
-    seniorProjectManager: "",
-    director: "",
-    additionalTeam: [],
-    totalBudget: 0,
-    amountSpent: 0,
-    taf: 0,
-    eac: 0,
-    currentYearCashflow: 0,
-    targetCashflow: 0,
-    lastPfmtUpdate: null,
-    scheduleStatus: "Green",
-    budgetStatus: "Green",
+  const updates = {
+    reportStatus: "Update Required",
     scheduleReasonCode: "",
     budgetReasonCode: "",
     monthlyComments: "",
     previousHighlights: "",
-    nextSteps: "Complete initial project planning and team assignment",
+    nextSteps: "",
     budgetVarianceExplanation: "",
     cashflowVarianceExplanation: "",
     submittedBy: null,
@@ -609,130 +937,9 @@ export const createNewProject = async (projectData) => {
     approvedDate: null,
     directorApproved: false,
     seniorPmReviewed: false,
-    // Initialize with template data
-    milestones: [
-      {
-        id: generateId(),
-        name: "Project Initiation",
-        status: "pending",
-        plannedDate: null,
-        actualDate: null,
-        baselineDate: null,
-        description: "Project kickoff and initial planning",
-        notes: "",
-        isNA: false,
-        isRequired: true
-      },
-      {
-        id: generateId(),
-        name: "Scope Definition",
-        status: "pending",
-        plannedDate: null,
-        actualDate: null,
-        baselineDate: null,
-        description: "Detailed scope and requirements definition",
-        notes: "",
-        isNA: false,
-        isRequired: true
-      },
-      {
-        id: generateId(),
-        name: "Budget Approval",
-        status: "pending",
-        plannedDate: null,
-        actualDate: null,
-        baselineDate: null,
-        description: "Budget finalization and approval",
-        notes: "",
-        isNA: false,
-        isRequired: true
-      }
-    ],
-    vendors: [
-      {
-        id: generateId(),
-        name: "Primary Contractor",
-        type: "General Contractor",
-        contact: "",
-        email: "",
-        phone: "",
-        status: "Pending Selection",
-        contractValue: 0,
-        notes: ""
-      }
-    ],
-    closeoutData: {
-      finalCost: 0,
-      completionDate: "",
-      lessonsLearned: "",
-      clientSatisfaction: "",
-      performanceMetrics: {}
-    },
-    monthlyArchive: []
+    updatedAt: new Date().toISOString()
   }
-
-  // Add to projects array
-  mockProjects.push(newProject)
   
-  return newProject
-}
-
-// Generate project report
-export const generateProjectReport = async (projectId, reportType = 'monthly') => {
-  await new Promise(resolve => setTimeout(resolve, 1000))
-  
-  const project = mockProjects.find(p => p.id === projectId)
-  if (!project) {
-    throw new Error('Project not found')
-  }
-
-  const reportData = {
-    id: generateId(),
-    projectId: project.id,
-    projectName: project.name,
-    reportType,
-    generatedDate: new Date().toISOString(),
-    generatedBy: "System",
-    data: {
-      projectSummary: {
-        name: project.name,
-        contractor: project.contractor,
-        phase: project.phase,
-        region: project.region,
-        projectManager: project.projectManager,
-        startDate: project.startDate
-      },
-      financialSummary: {
-        totalBudget: project.totalBudget,
-        amountSpent: project.amountSpent,
-        taf: project.taf,
-        eac: project.eac,
-        variance: project.eac - project.taf,
-        currentYearCashflow: project.currentYearCashflow,
-        targetCashflow: project.targetCashflow
-      },
-      statusSummary: {
-        scheduleStatus: project.scheduleStatus,
-        budgetStatus: project.budgetStatus,
-        scheduleReasonCode: project.scheduleReasonCode,
-        budgetReasonCode: project.budgetReasonCode,
-        reportStatus: project.reportStatus
-      },
-      milestones: project.milestones,
-      monthlyComments: project.monthlyComments,
-      previousHighlights: project.previousHighlights,
-      nextSteps: project.nextSteps,
-      approvalHistory: {
-        submittedBy: project.submittedBy,
-        submittedDate: project.submittedDate,
-        approvedBy: project.approvedBy,
-        approvedDate: project.approvedDate,
-        directorApproved: project.directorApproved
-      },
-      monthlyArchive: project.monthlyArchive
-    }
-  }
-
-  return reportData
+  return updateProject(projectId, updates)
 }
 
