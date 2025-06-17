@@ -1,4 +1,4 @@
-// Enhanced Database service using lowdb for JSON-based persistence
+// Enhanced Database service using lowdb for JSON-based persistence - FIXED VERSION
 import { Low } from 'lowdb'
 import { JSONFileSync } from 'lowdb/node'
 import { v4 as uuidv4 } from 'uuid'
@@ -389,7 +389,7 @@ export function getDatabase() {
   return db
 }
 
-// Helper functions for common operations with enhanced filtering
+// Helper functions for common operations with enhanced filtering - FIXED VERSION
 export function getAllProjects(filters = {}) {
   db.read()
   let projects = db.data.projects || []
@@ -397,14 +397,16 @@ export function getAllProjects(filters = {}) {
   // Apply role-based filtering
   if (filters.userId && filters.userRole) {
     const role = filters.userRole.toLowerCase()
-    const userId = filters.userId
+    // FIXED: Ensure userId is always an integer for consistent comparison
+    const userId = parseInt(filters.userId)
     
     if (role === 'project manager' || role === 'senior project manager' || role === 'pm') {
       // Project managers can see projects they own or manage
       projects = projects.filter(p => {
         return (
-          p.ownerId === userId ||
-          p.createdByUserId === userId ||
+          // FIXED: Ensure both sides of comparison are integers
+          parseInt(p.ownerId) === userId ||
+          parseInt(p.createdByUserId) === userId ||
           (p.projectManager && p.projectManager.toLowerCase().includes(getUserNameById(userId)?.toLowerCase() || '')) ||
           (p.seniorProjectManager && p.seniorProjectManager.toLowerCase().includes(getUserNameById(userId)?.toLowerCase() || ''))
         )
@@ -414,7 +416,8 @@ export function getAllProjects(filters = {}) {
   
   // Apply additional filters
   if (filters.ownerId) {
-    projects = projects.filter(p => p.ownerId === parseInt(filters.ownerId))
+    // FIXED: Ensure consistent integer comparison
+    projects = projects.filter(p => parseInt(p.ownerId) === parseInt(filters.ownerId))
   }
   
   if (filters.status) {
@@ -446,20 +449,22 @@ export function getProjectById(id) {
   return db.data.projects?.find(p => p.id === id) || null
 }
 
+// FIXED: Enhanced createProject function with proper data types and field assignments
 export function createProject(projectData, userContext = null) {
   db.read()
   
-  console.log('=== Database createProject (ENHANCED) ===')
+  console.log('=== Database createProject (ENHANCED & FIXED) ===')
   console.log('Project data:', JSON.stringify(projectData, null, 2))
   console.log('User context:', JSON.stringify(userContext, null, 2))
   
   const newProject = {
     id: uuidv4(),
     ...projectData,
-    // ENHANCED: Ensure proper user context is set for visibility
+    // FIXED: Ensure proper user context is set for visibility with correct data types
     createdByUserId: userContext?.id || projectData.createdByUserId || projectData.ownerId,
     ownerId: projectData.ownerId || userContext?.id,
-    createdBy: userContext?.id || projectData.createdBy,
+    // FIXED: Store user name in createdBy field, not user ID
+    createdBy: userContext?.name || projectData.createdBy || getUserNameById(userContext?.id),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     lastUpdated: new Date().toISOString()
@@ -471,8 +476,15 @@ export function createProject(projectData, userContext = null) {
     throw new Error('User context required for project creation - ownerId must be set')
   }
   
-  console.log(`✅ Creating project with ownerId: ${newProject.ownerId}`)
+  // FIXED: Ensure ownerId is stored as integer for consistent filtering
+  newProject.ownerId = parseInt(newProject.ownerId)
+  if (newProject.createdByUserId) {
+    newProject.createdByUserId = parseInt(newProject.createdByUserId)
+  }
+  
+  console.log(`✅ Creating project with ownerId: ${newProject.ownerId} (type: ${typeof newProject.ownerId})`)
   console.log(`✅ Creating project with createdBy: ${newProject.createdBy}`)
+  console.log(`✅ Creating project with createdByUserId: ${newProject.createdByUserId} (type: ${typeof newProject.createdByUserId})`)
   
   // Add to database
   if (!db.data.projects) {
@@ -530,14 +542,15 @@ export function getAllUsers() {
 
 export function getUserById(id) {
   db.read()
-  return db.data.users?.find(u => u.id === parseInt(id)) || null
+  // FIXED: Ensure consistent integer comparison for user lookup
+  return db.data.users?.find(u => parseInt(u.id) === parseInt(id)) || null
 }
 
 export function createUser(userData) {
   db.read()
   
   const newUser = {
-    id: Math.max(...(db.data.users?.map(u => u.id) || [0])) + 1,
+    id: Date.now(), // Simple ID generation
     ...userData,
     createdAt: new Date().toISOString()
   }
@@ -555,7 +568,7 @@ export function createUser(userData) {
 export function updateUser(id, updates) {
   db.read()
   
-  const userIndex = db.data.users?.findIndex(u => u.id === parseInt(id))
+  const userIndex = db.data.users?.findIndex(u => parseInt(u.id) === parseInt(id))
   if (userIndex === -1) {
     throw new Error('User not found')
   }
@@ -573,7 +586,7 @@ export function updateUser(id, updates) {
 export function deleteUser(id) {
   db.read()
   
-  const userIndex = db.data.users?.findIndex(u => u.id === parseInt(id))
+  const userIndex = db.data.users?.findIndex(u => parseInt(u.id) === parseInt(id))
   if (userIndex === -1) {
     throw new Error('User not found')
   }
@@ -585,6 +598,6 @@ export function deleteUser(id) {
   return deletedUser
 }
 
-// Initialize database on module load
-initializeDatabase()
+// Export database instance for direct access if needed
+export { db }
 

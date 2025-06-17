@@ -1,4 +1,4 @@
-// Enhanced Project controller for handling HTTP requests with fixed permissions
+// Enhanced Project controller for handling HTTP requests with fixed permissions - COMPLETE FIXED VERSION
 import { ProjectService } from '../services/projectService.js'
 import { UserService } from '../services/userService.js'
 
@@ -23,12 +23,13 @@ export class ProjectController {
       // If user is authenticated, apply role-based filtering
       if (req.user) {
         const userRole = req.user.role?.toLowerCase()
-        const userId = req.user.id
+        // FIXED: Ensure userId is always an integer for consistent comparison
+        const userId = parseInt(req.user.id)
         
         // Admin users can see all projects
         if (userRole === 'admin' || userRole === 'director') {
           // Apply any additional filters if provided
-          if (ownerId) options.ownerId = ownerId
+          if (ownerId) options.ownerId = parseInt(ownerId)
           if (status) options.status = status
           if (reportStatus) options.reportStatus = reportStatus
         }
@@ -43,7 +44,7 @@ export class ProjectController {
           if (reportStatus) options.reportStatus = reportStatus
           
           // Don't override ownerId filter if user is trying to filter by specific owner
-          if (ownerId) options.ownerId = ownerId
+          if (ownerId) options.ownerId = parseInt(ownerId)
         }
         // Other roles get limited access
         else {
@@ -53,7 +54,7 @@ export class ProjectController {
         }
       } else {
         // If no user context, apply basic filters
-        if (ownerId) options.ownerId = ownerId
+        if (ownerId) options.ownerId = parseInt(ownerId)
         if (status) options.status = status
         if (reportStatus) options.reportStatus = reportStatus
       }
@@ -65,7 +66,7 @@ export class ProjectController {
         data: result.projects,
         pagination: result.pagination,
         userContext: req.user ? {
-          id: req.user.id,
+          id: parseInt(req.user.id),
           role: req.user.role,
           name: req.user.name
         } : null
@@ -96,7 +97,8 @@ export class ProjectController {
       // Check if user has permission to view this project
       if (req.user) {
         const userRole = req.user.role?.toLowerCase()
-        const userId = req.user.id
+        // FIXED: Ensure userId is always an integer for consistent comparison
+        const userId = parseInt(req.user.id)
         
         // Admin and directors can view all projects
         if (userRole === 'admin' || userRole === 'director') {
@@ -105,7 +107,8 @@ export class ProjectController {
         // Project managers can view projects they own or manage
         else if (userRole === 'project manager' || userRole === 'senior project manager' || userRole === 'pm') {
           const hasAccess = (
-            project.ownerId === userId ||
+            // FIXED: Ensure both sides of comparison are integers
+            parseInt(project.ownerId) === userId ||
             project.projectManager === req.user.name ||
             project.seniorProjectManager === req.user.name
           )
@@ -120,7 +123,7 @@ export class ProjectController {
         }
         // Other roles can only view their own projects
         else {
-          if (project.ownerId !== userId) {
+          if (parseInt(project.ownerId) !== userId) {
             return res.status(403).json({
               success: false,
               error: 'Access denied',
@@ -149,7 +152,7 @@ export class ProjectController {
     try {
       const projectData = req.body
       
-      console.log('=== Controller createProject (ENHANCED) ===')
+      console.log('=== Controller createProject (ENHANCED & FIXED) ===')
       console.log('Request body:', JSON.stringify(projectData, null, 2))
       console.log('Request user:', JSON.stringify(req.user, null, 2))
       
@@ -164,10 +167,12 @@ export class ProjectController {
       
       // ENHANCED: Ensure proper ownership assignment
       if (req.user) {
-        // Set the creator as the owner if not specified
+        // FIXED: Ensure ownerId is stored as integer
         if (!projectData.ownerId) {
-          projectData.ownerId = req.user.id
-          console.log(`✅ Set ownerId to: ${req.user.id}`)
+          projectData.ownerId = parseInt(req.user.id)
+          console.log(`✅ Set ownerId to: ${projectData.ownerId} (type: ${typeof projectData.ownerId})`)
+        } else {
+          projectData.ownerId = parseInt(projectData.ownerId)
         }
         
         // Set project manager if not specified and user is a PM
@@ -179,9 +184,9 @@ export class ProjectController {
         
         // Add creation metadata
         projectData.createdBy = req.user.name
-        projectData.createdByUserId = req.user.id
+        projectData.createdByUserId = parseInt(req.user.id)
         console.log(`✅ Set createdBy to: ${req.user.name}`)
-        console.log(`✅ Set createdByUserId to: ${req.user.id}`)
+        console.log(`✅ Set createdByUserId to: ${projectData.createdByUserId} (type: ${typeof projectData.createdByUserId})`)
       } else {
         console.error('❌ CRITICAL: No user context in request!')
         return res.status(401).json({
@@ -194,7 +199,7 @@ export class ProjectController {
       const newProject = ProjectService.createProject(projectData, req.user)
       
       console.log(`✅ Project created successfully: ${newProject.id}`)
-      console.log(`✅ Project owner: ${newProject.ownerId}`)
+      console.log(`✅ Project owner: ${newProject.ownerId} (type: ${typeof newProject.ownerId})`)
       
       res.status(201).json({
         success: true,
@@ -211,7 +216,7 @@ export class ProjectController {
     }
   }
   
-  // PUT /api/projects/:id - Enhanced with permission checks
+  // PUT /api/projects/:id
   static async updateProject(req, res) {
     try {
       const { id } = req.params
@@ -229,7 +234,7 @@ export class ProjectController {
       // Check if user has permission to update this project
       if (req.user) {
         const userRole = req.user.role?.toLowerCase()
-        const userId = req.user.id
+        const userId = parseInt(req.user.id)
         
         // Admin and directors can update all projects
         if (userRole === 'admin' || userRole === 'director') {
@@ -238,7 +243,7 @@ export class ProjectController {
         // Project managers can update projects they own or manage
         else if (userRole === 'project manager' || userRole === 'senior project manager' || userRole === 'pm') {
           const hasAccess = (
-            existingProject.ownerId === userId ||
+            parseInt(existingProject.ownerId) === userId ||
             existingProject.projectManager === req.user.name ||
             existingProject.seniorProjectManager === req.user.name
           )
@@ -253,7 +258,7 @@ export class ProjectController {
         }
         // Other roles can only update their own projects
         else {
-          if (existingProject.ownerId !== userId) {
+          if (parseInt(existingProject.ownerId) !== userId) {
             return res.status(403).json({
               success: false,
               error: 'Access denied',
@@ -261,10 +266,6 @@ export class ProjectController {
             })
           }
         }
-        
-        // Add update metadata
-        updates.lastUpdatedBy = req.user.name
-        updates.lastUpdatedByUserId = req.user.id
       }
       
       const updatedProject = ProjectService.updateProject(id, updates)
@@ -276,14 +277,6 @@ export class ProjectController {
       })
     } catch (error) {
       console.error('Error updating project:', error)
-      
-      if (error.message === 'Project not found') {
-        return res.status(404).json({
-          success: false,
-          error: 'Project not found'
-        })
-      }
-      
       res.status(500).json({
         success: false,
         error: 'Failed to update project',
@@ -292,7 +285,7 @@ export class ProjectController {
     }
   }
   
-  // DELETE /api/projects/:id - Enhanced with permission checks
+  // DELETE /api/projects/:id
   static async deleteProject(req, res) {
     try {
       const { id } = req.params
@@ -309,48 +302,49 @@ export class ProjectController {
       // Check if user has permission to delete this project
       if (req.user) {
         const userRole = req.user.role?.toLowerCase()
-        const userId = req.user.id
+        const userId = parseInt(req.user.id)
         
-        // Only admin and directors can delete projects
+        // Admin and directors can delete all projects
         if (userRole === 'admin' || userRole === 'director') {
           // Allow deletion
         }
-        // Project managers can delete their own projects only
+        // Project managers can delete projects they own or manage
         else if (userRole === 'project manager' || userRole === 'senior project manager' || userRole === 'pm') {
-          if (existingProject.ownerId !== userId) {
+          const hasAccess = (
+            parseInt(existingProject.ownerId) === userId ||
+            existingProject.projectManager === req.user.name ||
+            existingProject.seniorProjectManager === req.user.name
+          )
+          
+          if (!hasAccess) {
             return res.status(403).json({
               success: false,
               error: 'Access denied',
-              message: 'Only administrators can delete projects'
+              message: 'You do not have permission to delete this project'
             })
           }
         }
-        // Other roles cannot delete projects
+        // Other roles can only delete their own projects
         else {
-          return res.status(403).json({
-            success: false,
-            error: 'Access denied',
-            message: 'You do not have permission to delete projects'
-          })
+          if (parseInt(existingProject.ownerId) !== userId) {
+            return res.status(403).json({
+              success: false,
+              error: 'Access denied',
+              message: 'You do not have permission to delete this project'
+            })
+          }
         }
       }
       
-      ProjectService.deleteProject(id)
+      const deletedProject = ProjectService.deleteProject(id)
       
       res.json({
         success: true,
+        data: deletedProject,
         message: 'Project deleted successfully'
       })
     } catch (error) {
       console.error('Error deleting project:', error)
-      
-      if (error.message === 'Project not found') {
-        return res.status(404).json({
-          success: false,
-          error: 'Project not found'
-        })
-      }
-      
       res.status(500).json({
         success: false,
         error: 'Failed to delete project',
@@ -359,7 +353,7 @@ export class ProjectController {
     }
   }
   
-  // POST /api/projects/:id/excel - Enhanced with permission checks
+  // POST /api/projects/:id/excel - Enhanced with permission checks and FIXED data types
   static async uploadExcel(req, res) {
     try {
       const { id } = req.params
@@ -383,7 +377,7 @@ export class ProjectController {
       
       if (req.user) {
         const userRole = req.user.role?.toLowerCase()
-        const userId = req.user.id
+        const userId = parseInt(req.user.id)  // FIXED: Ensure integer comparison
         
         // Admin and directors can upload to all projects
         if (userRole === 'admin' || userRole === 'director') {
@@ -392,7 +386,7 @@ export class ProjectController {
         // Project managers can upload to projects they own or manage
         else if (userRole === 'project manager' || userRole === 'senior project manager' || userRole === 'pm') {
           const hasAccess = (
-            existingProject.ownerId === userId ||
+            parseInt(existingProject.ownerId) === userId ||  // FIXED: Integer comparison
             existingProject.projectManager === req.user.name ||
             existingProject.seniorProjectManager === req.user.name
           )
@@ -407,7 +401,7 @@ export class ProjectController {
         }
         // Other roles can only upload to their own projects
         else {
-          if (existingProject.ownerId !== userId) {
+          if (parseInt(existingProject.ownerId) !== userId) {  // FIXED: Integer comparison
             return res.status(403).json({
               success: false,
               error: 'Access denied',
@@ -455,7 +449,7 @@ export class ProjectController {
     }
   }
 
-  // POST /api/projects/:id/pfmt-excel - Enhanced with permission checks
+  // POST /api/projects/:id/pfmt-excel - Enhanced with permission checks and FIXED data types
   static async uploadPFMTExcel(req, res) {
     try {
       const { id } = req.params
@@ -479,7 +473,7 @@ export class ProjectController {
       
       if (req.user) {
         const userRole = req.user.role?.toLowerCase()
-        const userId = req.user.id
+        const userId = parseInt(req.user.id)  // FIXED: Ensure integer comparison
         
         // Admin and directors can upload to all projects
         if (userRole === 'admin' || userRole === 'director') {
@@ -488,7 +482,7 @@ export class ProjectController {
         // Project managers can upload to projects they own or manage
         else if (userRole === 'project manager' || userRole === 'senior project manager' || userRole === 'pm') {
           const hasAccess = (
-            existingProject.ownerId === userId ||
+            parseInt(existingProject.ownerId) === userId ||  // FIXED: Integer comparison
             existingProject.projectManager === req.user.name ||
             existingProject.seniorProjectManager === req.user.name
           )
@@ -503,7 +497,7 @@ export class ProjectController {
         }
         // Other roles can only upload to their own projects
         else {
-          if (existingProject.ownerId !== userId) {
+          if (parseInt(existingProject.ownerId) !== userId) {  // FIXED: Integer comparison
             return res.status(403).json({
               success: false,
               error: 'Access denied',

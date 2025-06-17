@@ -9,8 +9,8 @@ import { Textarea } from '@/components/ui/textarea.jsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.jsx'
 import { Alert, AlertDescription } from '@/components/ui/alert.jsx'
 import { Plus, Building2, FileText, Users, MapPin, AlertCircle } from 'lucide-react'
-import { useNotifications, useAuth } from '../../hooks/index.js'
-import { createNewProject, getUsers, importPFMTData } from '../../services/mockData.js'
+import { useNotifications, useAuth, useProjects } from '../../hooks/index.js'
+import { ProjectAPI, UserAPI } from '../../services/apiService.js'
 import { PFMTDataExtractor } from '../PFMTDataExtractor.jsx'
 
 export function AddNewProjectDialog({ onProjectCreated }) {
@@ -28,6 +28,7 @@ export function AddNewProjectDialog({ onProjectCreated }) {
   })
   const { showSuccess, showError } = useNotifications()
   const { currentUser } = useAuth()
+  const { refetch } = useProjects()
 
   // Load users when dialog opens
   React.useEffect(() => {
@@ -38,8 +39,8 @@ export function AddNewProjectDialog({ onProjectCreated }) {
 
   const loadUsers = async () => {
     try {
-      const userData = await getUsers()
-      setUsers(userData)
+      const response = await UserAPI.getUsers()
+      setUsers(response.data || [])
     } catch (error) {
       console.error('Failed to load users:', error)
     }
@@ -72,30 +73,28 @@ export function AddNewProjectDialog({ onProjectCreated }) {
         throw new Error(`Please fill in all required fields: ${missingFields.join(', ')}`)
       }
 
-      // Create the new project with enhanced data model
-      const newProject = await createNewProject({
+      // Create the new project with enhanced data model using real API
+      const newProject = await ProjectAPI.createProject({
         name: projectData.projectName,
         description: projectData.scopeDescription,
         preliminaryResourceRequirements: projectData.preliminaryResourceRequirements,
         programAssignment: projectData.programAssignment,
         clientMinistry: projectData.clientMinistry,
         projectType: projectData.projectType,
-        createdBy: currentUser.name,
-        createdDate: new Date().toISOString(),
         status: 'Active',
-        projectManager: currentUser.name,
         phase: 'Initiation',
-        assignedUsers: projectData.assignedUsers
+        // The backend will automatically set ownerId and createdBy from user context
       })
 
-      // Update project with assigned users if any
-      if (projectData.assignedUsers.length > 0) {
-        // In a real implementation, this would update the userIds array
-        // For now, we'll just include it in the project data
-        newProject.userIds = [...new Set([newProject.ownerId, ...projectData.assignedUsers])]
+      // Refresh the projects list to show the new project
+      if (refetch) {
+        await refetch()
       }
 
-      onProjectCreated(newProject)
+      if (onProjectCreated) {
+        onProjectCreated(newProject.data)
+      }
+      
       showSuccess('Project created successfully!')
       
       // Reset form

@@ -4,8 +4,12 @@ import multer from 'multer'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { ProjectController } from '../controllers/projectController.js'
+import { userContextMiddleware } from '../middleware/userContext.js'
 
 const router = express.Router()
+
+// Apply user context middleware to all routes
+router.use(userContextMiddleware)
 
 // Get __dirname equivalent for ES modules
 const __filename = fileURLToPath(import.meta.url)
