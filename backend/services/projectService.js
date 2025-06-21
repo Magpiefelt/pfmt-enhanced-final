@@ -1,5 +1,6 @@
 // Enhanced Project service layer for comprehensive PFMT Excel processing
 import * as db from './database.js'
+import VendorService from './vendorService.js'
 import XLSX from 'xlsx'
 import fs from 'fs/promises'
 
@@ -72,7 +73,18 @@ export class ProjectService {
   
   // Get single project by ID
   static getProjectById(id) {
-    return db.getProjectById(id)
+    const project = db.getProjectById(id)
+    if (!project) {
+      return null
+    }
+    
+    // Enrich project with vendor information
+    const vendors = VendorService.getVendorsByProject(id)
+    
+    return {
+      ...project,
+      vendors: vendors
+    }
   }
   
   // Create new project
@@ -731,7 +743,14 @@ export class ProjectService {
       if (workbook.SheetNames.includes('Cost Tracking')) {
         console.log('Processing Cost Tracking sheet...')
         const vendorData = this.processCostTracking(workbook.Sheets['Cost Tracking'])
-        extractedData.vendors = vendorData
+        
+        // Create vendor contracts using the new VendorService
+        if (vendorData && vendorData.length > 0) {
+          console.log(`Creating ${vendorData.length} vendor contracts...`)
+          const createdVendors = VendorService.createVendorsFromExcelData(vendorData, projectId)
+          console.log(`Successfully created ${createdVendors.length} vendor contracts`)
+        }
+        
         extractedData.sheetsProcessed.push('Cost Tracking')
       }
       

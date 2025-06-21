@@ -240,3 +240,120 @@ export class UserAPI {
   }
 }
 
+
+// Company API methods
+export class CompanyAPI {
+  // Get all companies
+  static async getCompanies(searchTerm = '') {
+    const params = searchTerm ? `?search=${encodeURIComponent(searchTerm)}` : ''
+    return await ApiService.request(`/companies${params}`)
+  }
+
+  // Get single company by ID
+  static async getCompany(id) {
+    return await ApiService.request(`/companies/${id}`)
+  }
+
+  // Create new company
+  static async createCompany(companyData) {
+    return await ApiService.request('/companies', {
+      method: 'POST',
+      body: JSON.stringify(companyData)
+    })
+  }
+
+  // Update company
+  static async updateCompany(id, updates) {
+    return await ApiService.request(`/companies/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates)
+    })
+  }
+
+  // Delete company
+  static async deleteCompany(id) {
+    return await ApiService.request(`/companies/${id}`, {
+      method: 'DELETE'
+    })
+  }
+
+  // Get companies with vendor count
+  static async getCompaniesWithVendorCount() {
+    return await ApiService.request('/companies/with-vendor-count')
+  }
+
+  // Get vendors for a company
+  static async getCompanyVendors(companyId) {
+    return await ApiService.request(`/companies/${companyId}/vendors`)
+  }
+}
+
+// Vendor API methods
+export class VendorAPI {
+  // Get vendors for a project
+  static async getProjectVendors(projectId) {
+    return await ApiService.request(`/projects/${projectId}/vendors`)
+  }
+
+  // Get vendor summary for a project
+  static async getProjectVendorSummary(projectId) {
+    return await ApiService.request(`/projects/${projectId}/vendors/summary`)
+  }
+
+  // Get single vendor by ID
+  static async getVendor(id) {
+    return await ApiService.request(`/vendors/${id}`)
+  }
+
+  // Create new vendor contract
+  static async createVendor(projectId, vendorData) {
+    return await ApiService.request(`/projects/${projectId}/vendors`, {
+      method: 'POST',
+      body: JSON.stringify(vendorData)
+    })
+  }
+
+  // Update vendor contract
+  static async updateVendor(id, updates) {
+    return await ApiService.request(`/vendors/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates)
+    })
+  }
+
+  // Delete vendor contract
+  static async deleteVendor(id) {
+    return await ApiService.request(`/vendors/${id}`, {
+      method: 'DELETE'
+    })
+  }
+}
+
+
+// Migration API methods
+export class MigrationAPI {
+  // Get migration status
+  static async getMigrationStatus() {
+    return await ApiService.request('/migration/status')
+  }
+
+  // Run migration
+  static async runMigration() {
+    return await ApiService.request('/migration/migrate', {
+      method: 'POST'
+    })
+  }
+
+  // Rollback migration
+  static async rollbackMigration() {
+    return await ApiService.request('/migration/rollback', {
+      method: 'POST'
+    })
+  }
+
+  // Validate migration
+  static async validateMigration() {
+    return await ApiService.request('/migration/validate')
+  }
+}
+

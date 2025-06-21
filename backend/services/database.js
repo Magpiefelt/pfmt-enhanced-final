@@ -293,7 +293,26 @@ const defaultData = {
     { id: 3, name: "Lisa Wilson", role: "Director", email: "lisa.wilson@company.com" },
     { id: 4, name: "David Chen", role: "Director", email: "david.chen@company.com" },
     { id: 5, name: "John Smith", role: "Vendor", email: "john.smith@vendor.com" }
-  ]
+  ],
+  companies: [
+    {
+      id: "company-1",
+      name: "ABC Construction Ltd.",
+      contactPerson: "Robert Smith",
+      contactEmail: "robert.smith@abcconstruction.com",
+      contactPhone: "(403) 555-0123",
+      address: "123 Industrial Ave",
+      city: "Calgary",
+      province: "AB",
+      postalCode: "T2E 1A1",
+      website: "www.abcconstruction.com",
+      businessNumber: "123456789RT0001",
+      notes: "Primary general contractor for education projects",
+      createdAt: "2024-01-01T08:00:00.000Z",
+      updatedAt: "2024-01-01T08:00:00.000Z"
+    }
+  ],
+  vendors: []
 }
 
 // Initialize database
@@ -376,6 +395,20 @@ function migrateProjectsToNewStructure() {
         project.lastUpdated = project.lastUpdated || project.updatedAt || new Date().toISOString()
       }
     }
+  }
+  
+  // Initialize companies collection if it doesn't exist
+  if (!db.data.companies) {
+    db.data.companies = defaultData.companies
+    migrationNeeded = true
+    console.log('Companies collection initialized')
+  }
+  
+  // Initialize vendors collection if it doesn't exist
+  if (!db.data.vendors) {
+    db.data.vendors = defaultData.vendors
+    migrationNeeded = true
+    console.log('Vendors collection initialized')
   }
   
   if (migrationNeeded) {
@@ -596,6 +629,142 @@ export function deleteUser(id) {
   db.write()
   
   return deletedUser
+}
+
+// Company CRUD operations
+export function getAllCompanies() {
+  db.read()
+  return db.data.companies || []
+}
+
+export function getCompanyById(id) {
+  db.read()
+  return db.data.companies?.find(c => c.id === id)
+}
+
+export function createCompany(companyData) {
+  db.read()
+  
+  if (!db.data.companies) {
+    db.data.companies = []
+  }
+  
+  const newCompany = {
+    ...companyData,
+    createdAt: companyData.createdAt || new Date().toISOString(),
+    updatedAt: companyData.updatedAt || new Date().toISOString()
+  }
+  
+  db.data.companies.push(newCompany)
+  db.write()
+  
+  return newCompany
+}
+
+export function updateCompany(id, updates) {
+  db.read()
+  
+  const companyIndex = db.data.companies?.findIndex(c => c.id === id)
+  if (companyIndex === -1) {
+    throw new Error('Company not found')
+  }
+  
+  db.data.companies[companyIndex] = {
+    ...db.data.companies[companyIndex],
+    ...updates,
+    updatedAt: new Date().toISOString()
+  }
+  
+  db.write()
+  return db.data.companies[companyIndex]
+}
+
+export function deleteCompany(id) {
+  db.read()
+  
+  const companyIndex = db.data.companies?.findIndex(c => c.id === id)
+  if (companyIndex === -1) {
+    throw new Error('Company not found')
+  }
+  
+  const deletedCompany = db.data.companies[companyIndex]
+  db.data.companies.splice(companyIndex, 1)
+  db.write()
+  
+  return deletedCompany
+}
+
+// Vendor CRUD operations
+export function getAllVendors() {
+  db.read()
+  return db.data.vendors || []
+}
+
+export function getVendorById(id) {
+  db.read()
+  return db.data.vendors?.find(v => v.id === id)
+}
+
+export function getVendorsByProject(projectId) {
+  db.read()
+  return (db.data.vendors || []).filter(v => v.projectId === projectId)
+}
+
+export function getVendorsByCompany(companyId) {
+  db.read()
+  return (db.data.vendors || []).filter(v => v.companyId === companyId)
+}
+
+export function createVendor(vendorData) {
+  db.read()
+  
+  if (!db.data.vendors) {
+    db.data.vendors = []
+  }
+  
+  const newVendor = {
+    ...vendorData,
+    createdAt: vendorData.createdAt || new Date().toISOString(),
+    updatedAt: vendorData.updatedAt || new Date().toISOString()
+  }
+  
+  db.data.vendors.push(newVendor)
+  db.write()
+  
+  return newVendor
+}
+
+export function updateVendor(id, updates) {
+  db.read()
+  
+  const vendorIndex = db.data.vendors?.findIndex(v => v.id === id)
+  if (vendorIndex === -1) {
+    throw new Error('Vendor not found')
+  }
+  
+  db.data.vendors[vendorIndex] = {
+    ...db.data.vendors[vendorIndex],
+    ...updates,
+    updatedAt: new Date().toISOString()
+  }
+  
+  db.write()
+  return db.data.vendors[vendorIndex]
+}
+
+export function deleteVendor(id) {
+  db.read()
+  
+  const vendorIndex = db.data.vendors?.findIndex(v => v.id === id)
+  if (vendorIndex === -1) {
+    throw new Error('Vendor not found')
+  }
+  
+  const deletedVendor = db.data.vendors[vendorIndex]
+  db.data.vendors.splice(vendorIndex, 1)
+  db.write()
+  
+  return deletedVendor
 }
 
 // Export database instance for direct access if needed

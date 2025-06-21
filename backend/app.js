@@ -8,6 +8,9 @@ import { fileURLToPath } from 'url'
 // Import routes
 import projectRoutes from './routes/projects.js'
 import userRoutes from './routes/users.js'
+import companyRoutes from './routes/companies.js'
+import vendorRoutes, { projectVendorRouter, companyVendorRouter } from './routes/vendors.js'
+import migrationRoutes from './routes/migration.js'
 
 // Load environment variables
 dotenv.config()
@@ -34,6 +37,13 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 // API Routes
 app.use('/api/projects', projectRoutes)
 app.use('/api/users', userRoutes)
+app.use('/api/companies', companyRoutes)
+app.use('/api/vendors', vendorRoutes)
+app.use('/api/migration', migrationRoutes)
+
+// Mount vendor sub-routes
+app.use('/api/projects/:projectId/vendors', projectVendorRouter)
+app.use('/api/companies/:companyId/vendors', companyVendorRouter)
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
