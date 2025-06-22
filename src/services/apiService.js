@@ -15,13 +15,20 @@ class ApiService {
           return authStore?.getState()?.currentUser
         }
         
-        // Fallback: try to import store (this might cause circular dependency)
-        const { useAuthStore } = require('../stores/index.js')
-        const authStore = useAuthStore.getState()
-        return authStore.currentUser
-      } catch (error) {
-        console.warn('Could not get current user from store, using default:', error)
+        // Try localStorage/sessionStorage fallback
+        const userStr = localStorage.getItem('currentUser') || sessionStorage.getItem('currentUser')
+        if (userStr) {
+          return JSON.parse(userStr)
+        }
+        
         // Return default user context for development
+        return {
+          id: 1,
+          name: "Sarah Johnson",
+          role: "Project Manager"
+        }
+      } catch (error) {
+        console.warn('Could not get current user from store, using default:', error.message)
         return {
           id: 1,
           name: "Sarah Johnson",
@@ -51,17 +58,14 @@ class ApiService {
 
     try {
       const response = await fetch(url, config)
-      const data = await response.json()
-
+      console.log('✅ API Response received:', response)
+      
       if (!response.ok) {
-        throw new Error(data.message || data.error || 'API request failed')
+        const errorText = await response.text()
+        throw new Error(`Route ${endpoint} not found`)
       }
-
-      console.log('✅ API Response received:', { 
-        endpoint, 
-        dataLength: data.data?.length, 
-        userContext: data.userContext 
-      })
+      
+      const data = await response.json()
       return data
     } catch (error) {
       console.error('❌ API request failed:', error)
@@ -83,11 +87,19 @@ class ApiService {
           return authStore?.getState()?.currentUser
         }
         
-        const { useAuthStore } = require('../stores/index.js')
-        const authStore = useAuthStore.getState()
-        return authStore.currentUser
+        // Try localStorage/sessionStorage fallback
+        const userStr = localStorage.getItem('currentUser') || sessionStorage.getItem('currentUser')
+        if (userStr) {
+          return JSON.parse(userStr)
+        }
+        
+        return {
+          id: 1,
+          name: "Sarah Johnson", 
+          role: "Project Manager"
+        }
       } catch (error) {
-        console.warn('Could not get current user from store for upload:', error)
+        console.warn('Could not get current user from store for upload:', error.message)
         return {
           id: 1,
           name: "Sarah Johnson", 
@@ -326,6 +338,39 @@ export class VendorAPI {
     return await ApiService.request(`/vendors/${id}`, {
       method: 'DELETE'
     })
+  }
+
+  // Get vendor dashboard summary
+  static async getVendorDashboard(projectId) {
+    return await ApiService.request(`/projects/${projectId}/vendors/dashboard`)
+  }
+
+  // Get extraction history
+  static async getExtractionHistory(projectId) {
+    return await ApiService.request(`/projects/${projectId}/vendors/extraction-history`)
+  }
+
+  // Extract vendors from spreadsheet
+  static async extractVendorsFromSpreadsheet(projectId, formData) {
+    return await ApiService.request(`/projects/${projectId}/vendors/extract`, {
+      method: 'POST',
+      headers: {}, // Remove Content-Type to let browser set it for FormData
+      body: formData
+    })
+  }
+
+  // Preview vendor extraction
+  static async previewVendorExtraction(projectId, formData) {
+    return await ApiService.request(`/projects/${projectId}/vendors/preview`, {
+      method: 'POST',
+      headers: {}, // Remove Content-Type to let browser set it for FormData
+      body: formData
+    })
+  }
+
+  // Main method for getting vendors (uses regular route, not enhanced)
+  static async getVendorsByProject(projectId) {
+    return await this.getProjectVendors(projectId)
   }
 }
 

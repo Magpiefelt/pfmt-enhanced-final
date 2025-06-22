@@ -41,7 +41,7 @@ app.use('/api/companies', companyRoutes)
 app.use('/api/vendors', vendorRoutes)
 app.use('/api/migration', migrationRoutes)
 
-// Mount vendor sub-routes
+// Mount vendor sub-routes (enhanced functionality is now integrated into vendors.js)
 app.use('/api/projects/:projectId/vendors', projectVendorRouter)
 app.use('/api/companies/:companyId/vendors', companyVendorRouter)
 

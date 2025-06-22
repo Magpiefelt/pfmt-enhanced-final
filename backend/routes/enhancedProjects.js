@@ -1,4 +1,4 @@
-// Enhanced Project Routes with Relational Data Model Support
+// Enhanced Project Routes with PDF Requirements Support
 import express from 'express'
 import EnhancedProjectController from '../controllers/enhancedProjectController.js'
 
@@ -8,16 +8,21 @@ const router = express.Router()
 const mockAuthMiddleware = (req, res, next) => {
   // In a real application, this would validate JWT tokens and set req.user
   // For now, we'll use a mock user based on headers or query params
-  const userId = req.headers['x-user-id'] || req.query.userId
+  const userId = req.headers['x-user-id'] || req.query.userId || '1'
   const userRole = req.headers['x-user-role'] || req.query.userRole || 'Project Manager'
+  const userName = req.headers['x-user-name'] || req.query.userName || 'Test User'
   
-  if (userId) {
-    req.user = {
-      id: parseInt(userId),
-      role: userRole,
-      permissions: getPermissionsForRole(userRole)
-    }
+  req.user = {
+    id: parseInt(userId),
+    role: userRole,
+    name: userName,
+    permissions: getPermissionsForRole(userRole)
   }
+  
+  // Set user headers for downstream services
+  req.headers['x-user-id'] = userId
+  req.headers['x-user-role'] = userRole
+  req.headers['x-user-name'] = userName
   
   next()
 }
@@ -61,53 +66,18 @@ function getPermissionsForRole(role) {
 // Apply mock auth middleware to all routes
 router.use(mockAuthMiddleware)
 
-// Core project routes
-router.get('/', EnhancedProjectController.getProjects)
-router.post('/', EnhancedProjectController.createProject)
-router.get('/:id', EnhancedProjectController.getProject)
-router.put('/:id', EnhancedProjectController.updateProject)
-router.delete('/:id', EnhancedProjectController.deleteProject)
+// Enhanced project routes
+router.get('/', EnhancedProjectController.getEnhancedProjects)
+router.post('/', EnhancedProjectController.createEnhancedProject)
+router.get('/dashboard', EnhancedProjectController.getEnhancedProjectDashboard)
+router.get('/attention', EnhancedProjectController.getProjectsRequiringAttention)
+router.get('/field-options', EnhancedProjectController.getProjectFieldOptions)
 
-// PFMT file upload
-router.post('/:id/upload-pfmt', EnhancedProjectController.uploadPFMT)
-
-// Project relationship endpoints
-router.get('/:id/vendors', EnhancedProjectController.getProjectVendors)
-router.get('/:id/funding-lines', EnhancedProjectController.getProjectFundingLines)
-router.get('/:id/change-orders', EnhancedProjectController.getProjectChangeOrders)
-router.get('/:id/assignments', EnhancedProjectController.getProjectAssignments)
-
-// Project assignment management
-router.post('/:id/assignments', EnhancedProjectController.assignUserToProject)
-router.delete('/:id/assignments/:userId', EnhancedProjectController.removeUserFromProject)
-
-// Project analytics
-router.get('/:id/analytics', EnhancedProjectController.getProjectAnalytics)
-
-// Vendor management
-router.get('/vendors/all', EnhancedProjectController.getAllVendors)
-router.post('/vendors', EnhancedProjectController.createVendor)
-
-// Legacy compatibility routes (redirect to new endpoints)
-router.get('/legacy/all', (req, res) => {
-  res.redirect('/api/projects')
-})
-
-router.post('/legacy/create', (req, res) => {
-  res.redirect(307, '/api/projects')
-})
-
-router.get('/legacy/:id', (req, res) => {
-  res.redirect(`/api/projects/${req.params.id}`)
-})
-
-router.put('/legacy/:id', (req, res) => {
-  res.redirect(307, `/api/projects/${req.params.id}`)
-})
-
-router.post('/legacy/:id/upload', (req, res) => {
-  res.redirect(307, `/api/projects/${req.params.id}/upload-pfmt`)
-})
+router.get('/:id', EnhancedProjectController.getEnhancedProjectById)
+router.put('/:id', EnhancedProjectController.updateEnhancedProject)
+router.put('/:id/team', EnhancedProjectController.updateProjectTeam)
+router.put('/:id/location', EnhancedProjectController.updateProjectLocation)
+router.post('/:id/pfmt-integration', EnhancedProjectController.integratePFMTData)
 
 export default router
 

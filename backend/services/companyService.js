@@ -22,6 +22,16 @@ export class CompanyService {
     )
   }
   
+  // Get company by external ID (for vendor extraction)
+  static getCompanyByExternalId(externalId) {
+    if (!externalId) return null
+    
+    const companies = db.getAllCompanies()
+    return companies.find(company => 
+      company.externalId && company.externalId.toString().trim() === externalId.toString().trim()
+    )
+  }
+  
   // Create new company
   static createCompany(companyData) {
     // Create Company instance for validation
